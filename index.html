@@ -296,10 +296,45 @@ canvas { width:100% !important; height:220px !important; }
 /* ═══════════════════════════════════════════════
    RESPONSIVE
 ═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   BOTTOM NAV — MOBILE
+═══════════════════════════════════════════════ */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 62px;
+  background: white;
+  border-top: 1px solid var(--border);
+  z-index: 200;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+}
+.bottom-nav-inner { display:flex; height:100%; }
+.bnav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+  border-top: 2px solid transparent;
+  transition: all 0.15s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.bnav-item.active { color:var(--blue); border-top-color:var(--blue); background:#f0f8ff; }
+.bnav-icon { font-size:20px; line-height:1; }
+
 @media(max-width:680px){
   :root { --sidebar-w: 0px; }
   .sidebar { display:none; }
-  .main { margin-left:0; padding:14px; }
+  .main { margin-left:0; padding:12px; padding-bottom:74px; }
+  .bottom-nav { display:block; }
 }
 </style>
 </head>
@@ -532,8 +567,11 @@ const estCharts = {};  // estCharts[sala][est] = Chart instance
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.bnav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.getElementById('nav-' + name).classList.add('active');
+  var bnavEl = document.getElementById('bnav-' + name);
+  if (bnavEl) bnavEl.classList.add('active');
   activePage = name;
   if (name === 'bme280') renderBmeCharts();
   if (name === 'graficos') renderGraficosEstanques();
@@ -1022,5 +1060,23 @@ function updateSensorCount() {
   document.getElementById('sidebarSensors').textContent = count;
 }
 </script>
+<!-- BOTTOM NAV MOBILE -->
+<nav class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <div class="bnav-item active" id="bnav-estanques" onclick="showPage('estanques')">
+      <span class="bnav-icon">🐟</span>Estanques
+    </div>
+    <div class="bnav-item" id="bnav-graficos" onclick="showPage('graficos')">
+      <span class="bnav-icon">📈</span>Graficos
+    </div>
+    <div class="bnav-item" id="bnav-bme280" onclick="showPage('bme280')">
+      <span class="bnav-icon">🌡️</span>Ambiente
+    </div>
+    <div class="bnav-item" id="bnav-log" onclick="showPage('log')">
+      <span class="bnav-icon">📋</span>Log
+    </div>
+  </div>
+</nav>
+
 </body>
 </html>
