@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AquaNode | Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.4/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
+<style>
+/* ═══════════════════════════════════════════════
+   RESET & ROOT
+═══════════════════════════════════════════════ */
+:root {
+  --bg:       #f0f4f8;
+  --surface:  #ffffff;
+  --border:   #e2e8f0;
+  --text:     #1a202c;
+  --muted:    #718096;
+  --blue:     #0a84ff;
+  --green:    #34c759;
+  --orange:   #ff9500;
+  --red:      #ff3b30;
+  --purple:   #5856d6;
+  --teal:     #32ade6;
+  --sidebar-w: 220px;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; }
+
+/* ═══════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════ */
+header {
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  height:52px;
+  background:var(--blue); color:white;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 20px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.15);
+}
+.header-left { display:flex; align-items:center; gap:10px; }
+.header-logo { font-size:20px; font-weight:700; letter-spacing:0.5px; }
+.header-logo span { font-weight:300; opacity:0.8; font-size:14px; margin-left:6px; }
+.header-right { display:flex; align-items:center; gap:8px; font-family:'DM Mono',monospace; font-size:11px; }
+.mqtt-dot { width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.3); transition:all 0.3s; flex-shrink:0; }
+.mqtt-dot.connected { background:#a8ffb8; box-shadow:0 0 6px #a8ffb8; animation:pulse 2s infinite; }
+.mqtt-dot.error { background:#ffaaaa; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+#mqttStatus { opacity:0.85; }
+
+/* ═══════════════════════════════════════════════
+   LAYOUT: SIDEBAR + CONTENT
+═══════════════════════════════════════════════ */
+.layout {
+  display:flex;
+  margin-top:52px;
+  min-height:calc(100vh - 52px);
+}
+
+/* ═══════════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════════ */
+.sidebar {
+  position:fixed;
+  top:52px; left:0; bottom:0;
+  width:var(--sidebar-w);
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  overflow-y:auto;
+  z-index:50;
+}
+.sidebar-section {
+  padding:16px 12px 6px;
+  font-size:10px; font-weight:700; letter-spacing:1.5px;
+  color:var(--muted); text-transform:uppercase;
+}
+.nav-item {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 16px;
+  font-size:14px; font-weight:500;
+  color:var(--text);
+  cursor:pointer;
+  border-left:3px solid transparent;
+  transition:all 0.15s;
+  border-radius:0 8px 8px 0;
+  margin:1px 8px 1px 0;
+  user-select:none;
+}
+.nav-item:hover { background:#f7fafc; }
+.nav-item.active { background:#e8f4ff; color:var(--blue); border-left-color:var(--blue); font-weight:600; }
+.nav-item .nav-icon { font-size:16px; flex-shrink:0; }
+
+.sidebar-footer {
+  margin-top:auto;
+  padding:12px 16px;
+  border-top:1px solid var(--border);
+  font-size:10px; font-family:'DM Mono',monospace; color:var(--muted);
+  line-height:1.8;
+}
+#sidebarMsgCount { color:var(--blue); font-weight:600; }
+#sidebarSensors  { color:var(--green); font-weight:600; }
+
+/* ═══════════════════════════════════════════════
+   MAIN CONTENT
+═══════════════════════════════════════════════ */
+.main {
+  margin-left:var(--sidebar-w);
+  flex:1;
+  padding:20px;
+  min-width:0;
+}
+
+/* ── PAGE ── */
+.page { display:none; }
+.page.active { display:block; }
+
+/* ═══════════════════════════════════════════════
+   SECTION TITLE
+═══════════════════════════════════════════════ */
+.section-title {
+  font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--muted); margin-bottom:14px;
+  display:flex; align-items:center; gap:10px;
+}
+.section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ═══════════════════════════════════════════════
+   ESTANQUES — CARDS GRID
+═══════════════════════════════════════════════ */
+.cards-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));
+  gap:14px;
+  margin-bottom:24px;
+}
+.card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:16px; padding:18px 18px 14px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.06);
+  display:flex; flex-direction:column; gap:10px;
+  transition:box-shadow 0.2s, transform 0.2s, border-color 0.3s;
+  animation:fadeIn 0.4s ease both;
+  position:relative; overflow:hidden;
+}
+.card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  background:linear-gradient(90deg, var(--blue), var(--teal));
+  opacity:0; transition:opacity 0.4s;
+}
+.card.updated::before { opacity:1; }
+.card.updated { animation:flashCard 0.6s ease; }
+@keyframes flashCard {
+  0%  { box-shadow:0 0 0 2px rgba(10,132,255,0.3); }
+  100%{ box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+}
+.card:hover { box-shadow:0 8px 24px rgba(0,0,0,0.10); transform:translateY(-2px); }
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+.card-header { display:flex; align-items:center; justify-content:space-between; }
+.card-title  { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.9px; color:var(--muted); }
+.status-dot  { width:9px; height:9px; border-radius:50%; background:#ddd; box-shadow:0 0 0 3px rgba(200,200,200,0.2); transition:all 0.3s; flex-shrink:0; }
+.status-dot.ok    { background:var(--green);  box-shadow:0 0 0 3px rgba(52,199,89,0.2); }
+.status-dot.warn  { background:var(--orange); box-shadow:0 0 0 3px rgba(255,149,0,0.2); }
+.status-dot.error { background:var(--red);    box-shadow:0 0 0 3px rgba(255,59,48,0.2); }
+
+.temp-row { display:flex; align-items:flex-end; gap:5px; }
+.temp-value { font-family:'DM Mono',monospace; font-size:52px; font-weight:500; line-height:1; letter-spacing:-3px; transition:color 0.4s; }
+.temp-unit  { font-size:18px; font-weight:400; color:var(--muted); margin-bottom:6px; }
+.temp-value.cold    { color:var(--teal); }
+.temp-value.normal  { color:var(--green); }
+.temp-value.warn    { color:var(--orange); }
+.temp-value.hot     { color:var(--red); }
+.temp-value.offline { color:#ccc; }
+
+.trend-badge {
+  display:inline-flex; align-items:center; gap:3px;
+  padding:3px 9px; border-radius:20px;
+  font-size:11px; font-weight:700; font-family:'DM Mono',monospace;
+}
+.trend-badge.up-bad    { background:#fff1f0; color:var(--red); }
+.trend-badge.down-good { background:#f0fff4; color:#22a84a; }
+.trend-badge.neutral   { background:#f7fafc; color:var(--muted); }
+
+.minmax-row { display:flex; gap:12px; font-size:12px; font-family:'DM Mono',monospace; }
+.val-max { color:var(--orange); font-weight:600; }
+.val-min { color:var(--purple); font-weight:600; }
+
+/* Gauge */
+.gauge-wrap { display:flex; flex-direction:column; gap:5px; }
+.gauge-track { position:relative; height:11px; border-radius:999px; background:#edf2f7; overflow:visible; }
+.gauge-target { position:absolute; top:0; bottom:0; border-radius:999px; background:rgba(52,199,89,0.18); border:1px solid rgba(52,199,89,0.45); pointer-events:none; transition:left 0.3s, width 0.3s; }
+.gauge-fill   { position:absolute; top:0; bottom:0; left:0; border-radius:999px; background:var(--blue); max-width:100%; transition:width 0.65s cubic-bezier(0.34,1.4,0.64,1), background 0.4s; }
+.gauge-needle { position:absolute; top:-4px; bottom:-4px; width:3px; border-radius:2px; background:var(--text); transform:translateX(-50%); z-index:2; box-shadow:0 1px 4px rgba(0,0,0,0.25); transition:left 0.65s cubic-bezier(0.34,1.4,0.64,1), background 0.4s; }
+.gauge-needle::before { content:''; position:absolute; top:-3px; left:50%; transform:translateX(-50%); width:7px; height:7px; border-radius:50%; background:inherit; }
+.gauge-limits { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; }
+
+.last-update { font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; text-align:right; }
+
+/* empty state */
+.empty-state { text-align:center; padding:60px 20px; color:var(--muted); font-size:13px; }
+.empty-state .icon { font-size:40px; margin-bottom:12px; opacity:0.4; }
+
+/* ═══════════════════════════════════════════════
+   SALA SELECT BAR
+═══════════════════════════════════════════════ */
+.filter-bar {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:10px 16px;
+  display:flex; align-items:center; gap:14px;
+  margin-bottom:16px; flex-wrap:wrap; font-size:13px; font-weight:500;
+}
+.filter-bar label { display:flex; align-items:center; gap:6px; color:var(--text); }
+.filter-bar select { padding:4px 8px; border-radius:6px; border:1px solid var(--border); font-size:13px; font-family:'DM Sans',sans-serif; }
+
+/* ═══════════════════════════════════════════════
+   BME280 WIDGETS
+═══════════════════════════════════════════════ */
+.widgets-row { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+.widget {
+  flex:1; min-width:160px; border-radius:14px; padding:14px 18px;
+  display:flex; align-items:center; gap:14px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.06); background:white; border:1px solid var(--border);
+  transition:box-shadow 0.2s;
+}
+.widget:hover { box-shadow:0 6px 20px rgba(0,0,0,0.10); }
+.widget-icon { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; }
+.widget-icon.temp { background:#fff0e6; }
+.widget-icon.hum  { background:#e6f9ec; }
+.widget-icon.pres { background:#f0e6ff; }
+.widget-info { display:flex; flex-direction:column; }
+.widget-label { font-size:11px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:0.5px; }
+.widget-value { font-size:28px; font-weight:700; line-height:1.1; }
+.widget-value.temp { color:#ff6b00; }
+.widget-value.hum  { color:var(--green); }
+.widget-value.pres { color:var(--purple); }
+.widget-unit  { font-size:13px; font-weight:500; color:#aaa; margin-top:1px; }
+.widget-time  { font-size:10px; color:#bbb; margin-top:3px; font-family:'DM Mono',monospace; }
+.widget-trend { font-size:12px; font-weight:600; margin-top:4px; display:flex; align-items:center; gap:3px; }
+.widget-trend.up-bad   { color:var(--red); }
+.widget-trend.up-good  { color:var(--green); }
+.widget-trend.down-bad { color:var(--blue); }
+.widget-trend.down-good{ color:var(--green); }
+.widget-trend.neutral  { color:#aaa; }
+.widget-minmax { font-size:11px; margin-top:3px; display:flex; gap:8px; }
+.widget-max { color:#ff8c00; font-weight:600; }
+.widget-min { color:var(--purple); font-weight:600; }
+
+/* ═══════════════════════════════════════════════
+   CHARTS
+═══════════════════════════════════════════════ */
+.chart-box {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; padding:16px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom:14px;
+}
+.chart-subtitle {
+  background:var(--blue); color:white;
+  padding:6px 12px; border-radius:6px;
+  font-weight:700; font-size:13px; margin-bottom:10px;
+  display:flex; align-items:center; gap:6px;
+}
+.chart-controls { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; align-items:center; font-size:13px; font-weight:500; }
+.chart-controls label { display:flex; align-items:center; gap:5px; }
+.chart-controls select { padding:3px 7px; border-radius:5px; border:1px solid var(--border); font-size:12px; }
+canvas { width:100% !important; height:220px !important; }
+
+/* ═══════════════════════════════════════════════
+   LOG PAGE
+═══════════════════════════════════════════════ */
+.log-table {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; overflow:hidden;
+}
+.log-header {
+  display:grid; grid-template-columns:100px 1fr 120px;
+  background:#f7fafc; border-bottom:1px solid var(--border);
+  padding:8px 16px; font-size:11px; font-weight:700; letter-spacing:0.5px; color:var(--muted); text-transform:uppercase;
+}
+.log-body { max-height:600px; overflow-y:auto; }
+.log-row {
+  display:grid; grid-template-columns:100px 1fr 120px;
+  padding:8px 16px; border-bottom:1px solid #f0f4f8;
+  font-size:12px; font-family:'DM Mono',monospace;
+  animation:fadeIn 0.2s ease;
+}
+.log-row:hover { background:#f7fafc; }
+.log-time  { color:var(--muted); }
+.log-topic { color:var(--blue); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.log-val   { color:var(--green); font-weight:500; text-align:right; }
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════ */
+@media(max-width:680px){
+  :root { --sidebar-w: 0px; }
+  .sidebar { display:none; }
+  .main { margin-left:0; padding:14px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════ HEADER ══════ -->
+<header>
+  <div class="header-left">
+    <div class="header-logo">🐟 AquaNode <span>Smart Water Monitoring</span></div>
+  </div>
+  <div class="header-right">
+    <div class="mqtt-dot" id="mqttDot"></div>
+    <span id="mqttStatus">Conectando...</span>
+  </div>
+</header>
+
+<!-- ══════ LAYOUT ══════ -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="sidebar-section">Monitoreo</div>
+    <div class="nav-item active" onclick="showPage('estanques')" id="nav-estanques">
+      <span class="nav-icon">🐟</span> Panel Estanques
+    </div>
+    <div class="nav-item" onclick="showPage('graficos')" id="nav-graficos">
+      <span class="nav-icon">📈</span> Gráficos Estanques
+    </div>
+    <div class="nav-item" onclick="showPage('bme280')" id="nav-bme280">
+      <span class="nav-icon">🌡️</span> Ambiente BME280
+    </div>
+    <div class="sidebar-section">Sistema</div>
+    <div class="nav-item" onclick="showPage('log')" id="nav-log">
+      <span class="nav-icon">📋</span> Log de Mensajes
+    </div>
+
+    <div class="sidebar-footer">
+      MENSAJES<br><span id="sidebarMsgCount">0</span><br><br>
+      SENSORES ACTIVOS<br><span id="sidebarSensors">0</span><br><br>
+      <span id="sidebarLastUpdate" style="color:var(--muted)">Sin datos</span>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- ══════════════════════════════════
+         PAGE: ESTANQUES
+    ══════════════════════════════════ -->
+    <div class="page active" id="page-estanques">
+      <div class="filter-bar">
+        <label>Sala:
+          <select id="salaSelect" onchange="renderEstanques()">
+            <option value="1">Sala 1</option>
+            <option value="2">Sala 2</option>
+            <option value="3">Sala 3</option>
+            <option value="4">Sala 4</option>
+          </select>
+        </label>
+        <span style="margin-left:auto;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace" id="estRefresh">En tiempo real vía MQTT</span>
+      </div>
+
+      <div class="section-title">Temperatura por Estanque</div>
+      <div class="cards-grid" id="estanquesGrid">
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="icon">📡</div>
+          <div>Esperando datos de sensores...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         PAGE: BME280
+    ══════════════════════════════════ -->
+    <div class="page" id="page-bme280">
+      <div class="filter-bar">
+        <label>Sala:
+          <select id="bme280SalaSelect">
+            <option value="1">Sala 1</option>
+            <option value="2">Sala 2</option>
+            <option value="3">Sala 3</option>
+            <option value="4">Sala 4</option>
+          </select>
+        </label>
+        <span style="margin-left:auto;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">En tiempo real vía MQTT</span>
+      </div>
+
+      <div class="section-title">Condiciones Ambientales</div>
+
+      <div class="widgets-row">
+        <div class="widget">
+          <div class="widget-icon temp">🌡️</div>
+          <div class="widget-info">
+            <span class="widget-label">Temperatura</span>
+            <span class="widget-value temp" id="bme_temp_val">--</span>
+            <span class="widget-unit">°C</span>
+            <span class="widget-trend neutral" id="bme_temp_trend">— sin datos</span>
+            <div class="widget-minmax">
+              <span class="widget-max" id="bme_temp_max">↑ --</span>
+              <span class="widget-min" id="bme_temp_min">↓ --</span>
+            </div>
+            <span class="widget-time" id="bme_temp_time">--</span>
+          </div>
+        </div>
+        <div class="widget">
+          <div class="widget-icon hum">💧</div>
+          <div class="widget-info">
+            <span class="widget-label">Humedad</span>
+            <span class="widget-value hum" id="bme_hum_val">--</span>
+            <span class="widget-unit">%</span>
+            <span class="widget-trend neutral" id="bme_hum_trend">— sin datos</span>
+            <div class="widget-minmax">
+              <span class="widget-max" id="bme_hum_max">↑ --</span>
+              <span class="widget-min" id="bme_hum_min">↓ --</span>
+            </div>
+            <span class="widget-time" id="bme_hum_time">--</span>
+          </div>
+        </div>
+        <div class="widget">
+          <div class="widget-icon pres">🔵</div>
+          <div class="widget-info">
+            <span class="widget-label">Presión</span>
+            <span class="widget-value pres" id="bme_pres_val">--</span>
+            <span class="widget-unit">hPa</span>
+            <span class="widget-trend neutral" id="bme_pres_trend">— sin datos</span>
+            <div class="widget-minmax">
+              <span class="widget-max" id="bme_pres_max">↑ --</span>
+              <span class="widget-min" id="bme_pres_min">↓ --</span>
+            </div>
+            <span class="widget-time" id="bme_pres_time">--</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Gráficos Tiempo Real</div>
+
+      <div class="chart-box">
+        <div class="chart-subtitle">🌡️ Temperatura Ambiente (°C)</div>
+        <canvas id="chartBmeTemp"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-subtitle">💧 Humedad Relativa (%)</div>
+        <canvas id="chartBmeHum"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-subtitle">🔵 Presión Atmosférica (hPa)</div>
+        <canvas id="chartBmePres"></canvas>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         PAGE: GRAFICOS ESTANQUES
+    ══════════════════════════════════ -->
+    <div class="page" id="page-graficos">
+      <div class="filter-bar">
+        <label>Sala:
+          <select id="graficosSalaSelect" onchange="renderGraficosEstanques()">
+            <option value="1">Sala 1</option>
+            <option value="2">Sala 2</option>
+            <option value="3">Sala 3</option>
+            <option value="4">Sala 4</option>
+          </select>
+        </label>
+        <span style="margin-left:auto;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">Tiempo real vía MQTT</span>
+      </div>
+      <div class="section-title">Temperatura en Tiempo Real por Estanque</div>
+      <div id="graficosGrid" style="display:flex;flex-direction:column;gap:14px;">
+        <div class="empty-state">
+          <div class="icon">📡</div>
+          <div>Esperando datos de sensores...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         PAGE: LOG
+    ══════════════════════════════════ -->
+    <div class="page" id="page-log">
+      <div class="section-title">Log de Mensajes MQTT</div>
+      <div class="log-table">
+        <div class="log-header">
+          <span>Hora</span><span>Topic</span><span style="text-align:right">Valor</span>
+        </div>
+        <div class="log-body" id="logBody">
+          <div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">Sin mensajes aún...</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════ */
+const BROKER = "wss://6d31b72c4c354177bb806d74d6a1dcbe.s1.eu.hivemq.cloud:8884/mqtt";
+const MQUSER = "hivemq.webclient.1778085461653";
+const MQPASS = "P2q3Zmgp#,QxEBG8a;&6";
+
+const TEMP_OBJ_MIN  = 18;
+const TEMP_OBJ_MAX  = 24;
+const GAUGE_ABS_MIN = 10;
+const GAUGE_ABS_MAX = 35;
+const N_ESTANQUES   = 8;
+const MAX_CHART_PTS = 60;   // máximo puntos en gráficos BME
+const MAX_LOG       = 100;
+
+/* ═══════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════ */
+let msgCount   = 0;
+let activePage = 'estanques';
+
+// Estanques: datos por sala → estanque → array de readings {t, v}
+const estData = {};   // estData[sala][estanque] = [{t, v}]
+
+// BME: buffer por sala → variable → [{t, v}]
+const bmeData = {};   // bmeData[sala][var] = [{t, v}]
+
+// Charts BME
+const bmeCharts = {};
+
+// Charts Estanques (gráficos page)
+const estCharts = {};  // estCharts[sala][est] = Chart instance
+
+/* ═══════════════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════════════ */
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  activePage = name;
+  if (name === 'bme280') renderBmeCharts();
+  if (name === 'graficos') renderGraficosEstanques();
+}
+
+/* ═══════════════════════════════════════════════
+   MQTT
+═══════════════════════════════════════════════ */
+const mqttClient = mqtt.connect(BROKER, {
+  username: MQUSER,
+  password: MQPASS,
+  clientId: 'aquanode_dash_' + Math.random().toString(16).slice(2, 8),
+  clean: true
+});
+
+mqttClient.on('connect', () => {
+  setMqttStatus('connected', 'HiveMQ Conectado');
+  mqttClient.subscribe('hatchery/#');
+});
+mqttClient.on('error', e => setMqttStatus('error', 'Error MQTT'));
+mqttClient.on('offline', () => setMqttStatus('', 'Desconectado'));
+
+mqttClient.on('message', (topic, payload) => {
+  try {
+    const data  = JSON.parse(payload.toString());
+    const valor = parseFloat(data.valor);
+    const unidad = data.unidad || '';
+    if (isNaN(valor)) return;
+    handleMessage(topic, valor, unidad);
+  } catch(e) {}
+});
+
+function setMqttStatus(cls, text) {
+  document.getElementById('mqttDot').className = 'mqtt-dot ' + cls;
+  document.getElementById('mqttStatus').textContent = text;
+}
+
+/* ═══════════════════════════════════════════════
+   MESSAGE HANDLER
+═══════════════════════════════════════════════ */
+function handleMessage(topic, valor, unidad) {
+  msgCount++;
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('es-CL');
+
+  // Sidebar stats
+  document.getElementById('sidebarMsgCount').textContent = msgCount;
+  document.getElementById('sidebarLastUpdate').textContent = 'Últ: ' + timeStr;
+
+  // Parse topic: hatchery/sala1/estanque3/temperatura
+  //              hatchery/sala1/ambiente/temperatura
+  const parts = topic.split('/');
+  if (parts.length < 4) return;
+  const salaStr    = parts[1];  // "sala1"
+  const nodoStr    = parts[2];  // "estanque3" | "ambiente"
+  const varStr     = parts[3];  // "temperatura" | "humedad" | "presion"
+  const salaNum    = parseInt(salaStr.replace('sala','')) || 1;
+
+  if (nodoStr === 'ambiente') {
+    // BME280
+    handleBme(salaNum, varStr, valor, now);
+  } else {
+    // Estanque
+    const estNum = parseInt(nodoStr.replace('estanque','')) || 1;
+    handleEstanque(salaNum, estNum, valor, now);
+  }
+
+  // Log
+  addLog(timeStr, topic, valor, unidad);
+
+  // Sensor count
+  updateSensorCount();
+}
+
+/* ═══════════════════════════════════════════════
+   ESTANQUES
+═══════════════════════════════════════════════ */
+function handleEstanque(sala, est, valor, date) {
+  if (!estData[sala]) estData[sala] = {};
+  if (!estData[sala][est]) estData[sala][est] = [];
+
+  estData[sala][est].push({ t: date, v: valor });
+  // Guardar hasta 120 lecturas por estanque
+  if (estData[sala][est].length > 120) estData[sala][est].shift();
+
+  // Solo renderizar si es la sala seleccionada
+  const salaActual = parseInt(document.getElementById('salaSelect').value);
+  if (sala === salaActual) {
+    ensureEstanqueCard(sala, est);
+    updateEstanqueCard(sala, est);
+    document.getElementById('estRefresh').textContent =
+      'Últ. dato: ' + date.toLocaleTimeString('es-CL');
+  }
+
+  // Actualizar gráfico si la página está activa y es la misma sala
+  const grafSala = parseInt(document.getElementById('graficosSalaSelect').value);
+  if (activePage === 'graficos' && sala === grafSala) {
+    updateGraficoEstanque(sala, est);
+  }
+}
+
+function renderEstanques() {
+  const sala = parseInt(document.getElementById('salaSelect').value);
+  document.getElementById('estanquesGrid').innerHTML =
+    '<div class="empty-state" style="grid-column:1/-1"><div class="icon">📡</div><div>Sin datos para esta sala aún...</div></div>';
+
+  if (estData[sala]) {
+    Object.keys(estData[sala]).forEach(est => {
+      ensureEstanqueCard(sala, parseInt(est));
+      updateEstanqueCard(sala, parseInt(est));
+    });
+  }
+}
+
+function ensureEstanqueCard(sala, est) {
+  const grid = document.getElementById('estanquesGrid');
+  const cardId = `estCard_${sala}_${est}`;
+  if (document.getElementById(cardId)) return;
+
+  // Remove empty state
+  const empty = grid.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  const rango   = GAUGE_ABS_MAX - GAUGE_ABS_MIN;
+  const leftPct = ((TEMP_OBJ_MIN - GAUGE_ABS_MIN) / rango * 100).toFixed(1);
+  const widPct  = ((TEMP_OBJ_MAX - TEMP_OBJ_MIN)  / rango * 100).toFixed(1);
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = cardId;
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="card-title">Estanque ${est}</span>
+      <span class="status-dot ok" id="dot_${sala}_${est}"></span>
+    </div>
+    <div class="temp-row">
+      <span class="temp-value normal" id="tv_${sala}_${est}">--.-</span>
+      <span class="temp-unit">°C</span>
+    </div>
+    <span class="trend-badge neutral" id="tr_${sala}_${est}">→ sin datos</span>
+    <div class="minmax-row">
+      <span class="val-max" id="mx_${sala}_${est}">↑ --.-°C</span>
+      <span class="val-min" id="mn_${sala}_${est}">↓ --.-°C</span>
+    </div>
+    <div class="gauge-wrap">
+      <div class="gauge-track">
+        <div class="gauge-target" style="left:${leftPct}%;width:${widPct}%"></div>
+        <div class="gauge-fill"   id="gf_${sala}_${est}" style="width:0%"></div>
+        <div class="gauge-needle" id="gn_${sala}_${est}" style="left:0%"></div>
+      </div>
+      <div class="gauge-limits"><span>${GAUGE_ABS_MIN}°C</span><span>${GAUGE_ABS_MAX}°C</span></div>
+    </div>
+    <div class="last-update" id="lu_${sala}_${est}">Sin datos</div>
+  `;
+  grid.appendChild(card);
+}
+
+function updateEstanqueCard(sala, est) {
+  const pts = estData[sala] && estData[sala][est] ? estData[sala][est] : [];
+  const card = document.getElementById(`estCard_${sala}_${est}`);
+  if (!card || pts.length === 0) return;
+
+  const last = pts[pts.length - 1];
+  const temp = last.v;
+  const rango = GAUGE_ABS_MAX - GAUGE_ABS_MIN;
+
+  let colorClass='normal', dotClass='ok', fillColor='#34c759';
+  if      (temp < TEMP_OBJ_MIN - 2) { colorClass='cold';   dotClass='warn';  fillColor='#32ade6'; }
+  else if (temp < TEMP_OBJ_MIN)     { colorClass='cold';   dotClass='warn';  fillColor='#32ade6'; }
+  else if (temp > TEMP_OBJ_MAX + 2) { colorClass='hot';    dotClass='error'; fillColor='#ff3b30'; }
+  else if (temp > TEMP_OBJ_MAX)     { colorClass='warn';   dotClass='warn';  fillColor='#ff9500'; }
+
+  document.getElementById(`tv_${sala}_${est}`).className = 'temp-value ' + colorClass;
+  document.getElementById(`tv_${sala}_${est}`).textContent = temp.toFixed(1);
+  document.getElementById(`dot_${sala}_${est}`).className = 'status-dot ' + dotClass;
+
+  // Gauge
+  const pct = Math.min(100, Math.max(0, (temp - GAUGE_ABS_MIN) / rango * 100));
+  const gf = document.getElementById(`gf_${sala}_${est}`);
+  const gn = document.getElementById(`gn_${sala}_${est}`);
+  gf.style.width = pct + '%'; gf.style.background = fillColor;
+  gn.style.left  = pct + '%'; gn.style.background = fillColor;
+
+  // Max/Min
+  let maxV = pts[0].v, minV = pts[0].v;
+  pts.forEach(p => { if (p.v > maxV) maxV = p.v; if (p.v < minV) minV = p.v; });
+  document.getElementById(`mx_${sala}_${est}`).textContent = `↑ ${maxV.toFixed(1)}°C`;
+  document.getElementById(`mn_${sala}_${est}`).textContent = `↓ ${minV.toFixed(1)}°C`;
+
+  // Tendencia
+  const ahoraMs  = last.t.getTime();
+  const haceUnaH = ahoraMs - 3600000;
+  let refPt = pts[0];
+  pts.forEach(p => {
+    if (Math.abs(p.t.getTime() - haceUnaH) < Math.abs(refPt.t.getTime() - haceUnaH)) refPt = p;
+  });
+  const delta = temp - refPt.v;
+  const tr = document.getElementById(`tr_${sala}_${est}`);
+  if (Math.abs(delta) < 0.05) {
+    tr.className = 'trend-badge neutral'; tr.textContent = '→ estable';
+  } else {
+    const sube = delta > 0;
+    tr.className = 'trend-badge ' + (sube ? 'up-bad' : 'down-good');
+    tr.textContent = (sube ? '↑ ' : '↓ ') + Math.abs(delta).toFixed(2) + '°C/hr';
+  }
+
+  document.getElementById(`lu_${sala}_${est}`).textContent =
+    'Últ: ' + last.t.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+
+  // Flash
+  card.classList.remove('updated');
+  void card.offsetWidth;
+  card.classList.add('updated');
+}
+
+/* ═══════════════════════════════════════════════
+   BME280
+═══════════════════════════════════════════════ */
+function handleBme(sala, variable, valor, date) {
+  if (!bmeData[sala]) bmeData[sala] = {};
+  if (!bmeData[sala][variable]) bmeData[sala][variable] = [];
+
+  bmeData[sala][variable].push({ t: date, v: valor });
+  if (bmeData[sala][variable].length > MAX_CHART_PTS) bmeData[sala][variable].shift();
+
+  const salaActual = parseInt(document.getElementById('bme280SalaSelect').value);
+  if (sala === salaActual) {
+    updateBmeWidget(variable, sala);
+    if (activePage === 'bme280') renderBmeCharts();
+  }
+}
+
+function updateBmeWidget(variable, sala) {
+  const pts = bmeData[sala] && bmeData[sala][variable] ? bmeData[sala][variable] : [];
+  if (pts.length === 0) return;
+
+  const idMap = { temperatura:'temp', humedad:'hum', presion:'pres' };
+  const unitMap = { temperatura:'°C', humedad:'%', presion:'hPa' };
+  const id   = idMap[variable];
+  const unit = unitMap[variable];
+  if (!id) return;
+
+  const last = pts[pts.length - 1];
+  document.getElementById(`bme_${id}_val`).textContent = last.v.toFixed(2);
+  document.getElementById(`bme_${id}_time`).textContent =
+    'Últ: ' + last.t.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+
+  let maxV = pts[0].v, minV = pts[0].v;
+  pts.forEach(p => { if (p.v > maxV) maxV = p.v; if (p.v < minV) minV = p.v; });
+  document.getElementById(`bme_${id}_max`).textContent = `↑ ${maxV.toFixed(2)} ${unit}`;
+  document.getElementById(`bme_${id}_min`).textContent = `↓ ${minV.toFixed(2)} ${unit}`;
+
+  // Tendencia
+  const ahoraMs  = last.t.getTime();
+  const haceUnaH = ahoraMs - 3600000;
+  let refPt = pts[0];
+  pts.forEach(p => {
+    if (Math.abs(p.t.getTime() - haceUnaH) < Math.abs(refPt.t.getTime() - haceUnaH)) refPt = p;
+  });
+  const delta    = last.v - refPt.v;
+  const absDelta = Math.abs(delta).toFixed(2);
+  const trendEl  = document.getElementById(`bme_${id}_trend`);
+  if (Math.abs(delta) < 0.05) {
+    trendEl.textContent = '→ estable'; trendEl.className = 'widget-trend neutral';
+  } else {
+    const sube = delta > 0;
+    trendEl.className = 'widget-trend ' + (sube ? 'up-bad' : 'down-good');
+    trendEl.textContent = (sube ? '↑ ' : '↓ ') + absDelta + ' ' + unit + '/hr';
+  }
+}
+
+function renderBmeCharts() {
+  const sala = parseInt(document.getElementById('bme280SalaSelect').value);
+  const cfgs = [
+    { id:'chartBmeTemp', variable:'temperatura', label:'Temperatura (°C)', color:'#ff6b00' },
+    { id:'chartBmeHum',  variable:'humedad',     label:'Humedad (%)',       color:'#34c759' },
+    { id:'chartBmePres', variable:'presion',     label:'Presión (hPa)',     color:'#5856d6' }
+  ];
+
+  cfgs.forEach(cfg => {
+    const pts = (bmeData[sala] && bmeData[sala][cfg.variable]) ? bmeData[sala][cfg.variable] : [];
+    const chartData = pts.map(p => ({ x: p.t, y: p.v }));
+
+    if (bmeCharts[cfg.id]) bmeCharts[cfg.id].destroy();
+    bmeCharts[cfg.id] = new Chart(document.getElementById(cfg.id), {
+      data: { datasets: [{
+        type: 'line', label: cfg.label, data: chartData,
+        borderColor: cfg.color, tension: 0.3, pointRadius: 2,
+        pointBackgroundColor: cfg.color, fill: false
+      }]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } },
+            ticks: { maxTicksLimit: 10, maxRotation: 0 },
+            grid: { color: 'rgba(0,0,0,0.05)' }
+          },
+          y: { ticks: { maxTicksLimit: 6 }, grid: { color: 'rgba(0,0,0,0.05)' } }
+        }
+      }
+    });
+  });
+}
+
+// Re-render BME cuando cambia la sala
+document.getElementById('bme280SalaSelect').addEventListener('change', () => {
+  ['temp','hum','pres'].forEach(id => {
+    document.getElementById(`bme_${id}_val`).textContent = '--';
+    document.getElementById(`bme_${id}_time`).textContent = '--';
+    document.getElementById(`bme_${id}_max`).textContent = '↑ --';
+    document.getElementById(`bme_${id}_min`).textContent = '↓ --';
+    document.getElementById(`bme_${id}_trend`).textContent = '— sin datos';
+    document.getElementById(`bme_${id}_trend`).className = 'widget-trend neutral';
+  });
+  renderBmeCharts();
+});
+
+/* ═══════════════════════════════════════════════
+   LOG
+═══════════════════════════════════════════════ */
+let logCount = 0;
+function addLog(time, topic, valor, unidad) {
+  const body = document.getElementById('logBody');
+
+  // Quitar placeholder
+  if (logCount === 0) body.innerHTML = '';
+  logCount++;
+
+  const row = document.createElement('div');
+  row.className = 'log-row';
+  row.innerHTML = `
+    <span class="log-time">${time}</span>
+    <span class="log-topic">${topic}</span>
+    <span class="log-val">${valor.toFixed(2)} ${unidad}</span>
+  `;
+  body.prepend(row);
+  while (body.children.length > MAX_LOG) body.removeChild(body.lastChild);
+}
+
+/* ═══════════════════════════════════════════════
+   GRÁFICOS POR ESTANQUE
+═══════════════════════════════════════════════ */
+const grafCharts = {};  // grafCharts[`${sala}_${est}`] = Chart
+
+function renderGraficosEstanques() {
+  const sala = parseInt(document.getElementById('graficosSalaSelect').value);
+  const grid = document.getElementById('graficosGrid');
+
+  // Destruir charts anteriores
+  Object.keys(grafCharts).forEach(k => { if (grafCharts[k]) { grafCharts[k].destroy(); delete grafCharts[k]; } });
+  grid.innerHTML = '';
+
+  const salaData = estData[sala];
+  if (!salaData || Object.keys(salaData).length === 0) {
+    grid.innerHTML = '<div class="empty-state"><div class="icon">📡</div><div>Sin datos para esta sala aún...</div></div>';
+    return;
+  }
+
+  // Ordenar estanques numéricamente
+  const ests = Object.keys(salaData).map(Number).sort((a,b) => a - b);
+
+  ests.forEach(est => {
+    const key = `${sala}_${est}`;
+    const pts = salaData[est] ? salaData[est].map(p => ({ x: p.t, y: p.v })) : [];
+
+    // Mini resumen (último valor, max, min)
+    let lastV = '--', maxV = '--', minV = '--';
+    if (pts.length > 0) {
+      lastV = pts[pts.length-1].y.toFixed(1);
+      let mx = pts[0].y, mn = pts[0].y;
+      pts.forEach(p => { if(p.y > mx) mx = p.y; if(p.y < mn) mn = p.y; });
+      maxV = mx.toFixed(1); minV = mn.toFixed(1);
+    }
+
+    // Color según temperatura
+    const temp = parseFloat(lastV);
+    let lineColor = '#34c759';
+    if (!isNaN(temp)) {
+      if      (temp < TEMP_OBJ_MIN) lineColor = '#32ade6';
+      else if (temp > TEMP_OBJ_MAX + 2) lineColor = '#ff3b30';
+      else if (temp > TEMP_OBJ_MAX) lineColor = '#ff9500';
+    }
+
+    // Contenedor del gráfico
+    const box = document.createElement('div');
+    box.className = 'chart-box';
+    box.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div class="chart-subtitle" style="margin-bottom:0">🐟 Estanque ${est} — Temperatura (°C)</div>
+        <div style="display:flex;gap:16px;font-family:'DM Mono',monospace;font-size:12px;">
+          <span style="color:var(--text);font-weight:700">${lastV}°C</span>
+          <span style="color:var(--orange)">↑ ${maxV}°C</span>
+          <span style="color:var(--purple)">↓ ${minV}°C</span>
+        </div>
+      </div>
+      <canvas id="grafChart_${key}" style="height:160px!important"></canvas>
+    `;
+    grid.appendChild(box);
+
+    // Crear chart
+    grafCharts[key] = new Chart(document.getElementById(`grafChart_${key}`), {
+      data: { datasets: [{
+        type: 'line', label: `Estanque ${est}`, data: pts,
+        borderColor: lineColor, backgroundColor: lineColor + '18',
+        tension: 0.3, pointRadius: 2, fill: true,
+        pointBackgroundColor: lineColor
+      }]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } },
+            ticks: { maxTicksLimit: 8, maxRotation: 0 },
+            grid: { color: 'rgba(0,0,0,0.05)' }
+          },
+          y: {
+            ticks: { maxTicksLimit: 5 },
+            grid: { color: 'rgba(0,0,0,0.05)' }
+          }
+        }
+      }
+    });
+  });
+}
+
+// Actualizar gráfico de un estanque individual al llegar dato nuevo
+function updateGraficoEstanque(sala, est) {
+  const key = `${sala}_${est}`;
+  const chart = grafCharts[key];
+  if (!chart) return;
+
+  const pts = estData[sala] && estData[sala][est]
+    ? estData[sala][est].map(p => ({ x: p.t, y: p.v }))
+    : [];
+
+  chart.data.datasets[0].data = pts;
+  chart.update('none');
+
+  // Actualizar resumen numérico
+  if (pts.length > 0) {
+    const lastV = pts[pts.length-1].y;
+    let mx = pts[0].y, mn = pts[0].y;
+    pts.forEach(p => { if(p.y > mx) mx = p.y; if(p.y < mn) mn = p.y; });
+
+    let lineColor = '#34c759';
+    if      (lastV < TEMP_OBJ_MIN)     lineColor = '#32ade6';
+    else if (lastV > TEMP_OBJ_MAX + 2) lineColor = '#ff3b30';
+    else if (lastV > TEMP_OBJ_MAX)     lineColor = '#ff9500';
+
+    chart.data.datasets[0].borderColor = lineColor;
+    chart.data.datasets[0].backgroundColor = lineColor + '18';
+    chart.data.datasets[0].pointBackgroundColor = lineColor;
+
+    const canvas = document.getElementById(`grafChart_${key}`);
+    if (canvas && canvas.parentElement) {
+      const spans = canvas.parentElement.previousElementSibling
+        ? canvas.parentElement.parentElement.querySelectorAll('span[style]')
+        : [];
+      // Actualizar los números del header
+      const header = canvas.closest('.chart-box').querySelector('div[style*="gap:16px"]');
+      if (header) {
+        const children = header.children;
+        if (children[0]) children[0].textContent = lastV.toFixed(1) + '°C';
+        if (children[1]) { children[1].textContent = '↑ ' + mx.toFixed(1) + '°C'; }
+        if (children[2]) { children[2].textContent = '↓ ' + mn.toFixed(1) + '°C'; }
+      }
+    }
+    chart.update('none');
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   SENSOR COUNT
+═══════════════════════════════════════════════ */
+function updateSensorCount() {
+  let count = 0;
+  Object.values(estData).forEach(sala => { count += Object.keys(sala).length; });
+  Object.values(bmeData).forEach(sala => { if (Object.keys(sala).length > 0) count++; });
+  document.getElementById('sidebarSensors').textContent = count;
+}
+</script>
+</body>
+</html>
