@@ -379,9 +379,12 @@ const qrData = {};
 
 /* ── Detectar URL automáticamente ── */
 (function detectUrl() {
-  const current = window.location.href;
-  // Si estamos corriendo desde GitHub Pages, extraer la base
-  const base = current.replace(/\/qr\.html.*$/, '').replace(/\/index\.html.*$/, '');
+  // Tomar solo origin + pathname sin el nombre del archivo actual
+  // Ej: https://2ref.github.io/Aquanode/qr.html → https://2ref.github.io/Aquanode
+  const url      = window.location;
+  const pathname = url.pathname;                          // /Aquanode/qr.html
+  const folder   = pathname.substring(0, pathname.lastIndexOf('/')); // /Aquanode
+  const base     = url.origin + folder;                  // https://2ref.github.io/Aquanode
   if (base.startsWith('http')) {
     document.getElementById('baseUrl').value = base;
   }
