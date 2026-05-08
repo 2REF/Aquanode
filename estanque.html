@@ -417,17 +417,21 @@ const BROKER  = "wss://6d31b72c4c354177bb806d74d6a1dcbe.s1.eu.hivemq.cloud:8884/
 const MQUSER  = "hivemq.webclient.1778085461653";
 const MQPASS  = "P2q3Zmgp#,QxEBG8a;&6";
 
-const TEMP_OBJ_MIN  = 18;
-const TEMP_OBJ_MAX  = 24;
-const GAUGE_ABS_MIN = 10;
-const GAUGE_ABS_MAX = 25;
-
 /* ══════════════════════════════════════
    LEER PARÁMETROS URL
+   sala, estanque + valores de temperatura
+   que genera qr.html automáticamente
 ══════════════════════════════════════ */
 const params  = new URLSearchParams(window.location.search);
 const sala    = parseInt(params.get('sala'))    || null;
 const estanque= parseInt(params.get('estanque'))|| null;
+
+// Valores de temperatura: vienen de la URL si fueron generados por qr.html
+// Si no existen, se usan los valores por defecto
+const TEMP_OBJ_MIN  = parseFloat(params.get('tmin')) || 18;
+const TEMP_OBJ_MAX  = parseFloat(params.get('tmax')) || 24;
+const GAUGE_ABS_MIN = parseFloat(params.get('gmin')) || 10;
+const GAUGE_ABS_MAX = parseFloat(params.get('gmax')) || 25;
 
 /* ══════════════════════════════════════
    VALIDAR
