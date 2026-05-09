@@ -337,7 +337,7 @@ body::before {
 }
 .range-item { display: flex; flex-direction: column; gap: 2px; }
 .range-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
-.range-val { font-weight: 700; font-size: 14px; color: var(--text); }
+.range-val { font-weight: 700; font-size: 12px; color: var(--text); white-space: nowrap; }
 
 /* ── WAITING ANIMATION ── */
 .waiting {
@@ -507,7 +507,7 @@ function buildUI() {
         <span class="range-val">${TEMP_OBJ_MIN}°C – ${TEMP_OBJ_MAX}°C</span>
       </div>
       <div class="range-item">
-        <span class="range-label">📊 Escala gauge</span>
+        <span class="range-label">📊 Escala</span>
         <span class="range-val">${GAUGE_ABS_MIN}°C – ${GAUGE_ABS_MAX}°C</span>
       </div>
       <div class="range-item">
