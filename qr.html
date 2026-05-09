@@ -112,6 +112,17 @@ header {
 }
 .qr-img-wrap canvas, .qr-img-wrap img { width: 148px !important; height: 148px !important; }
 .qr-url { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted); text-align: center; word-break: break-all; line-height: 1.4; }
+.qr-desc-wrap { width: 100%; }
+.qr-desc-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 4px; display: block; }
+.qr-desc-input {
+  width: 100%; padding: 7px 10px; border-radius: 8px;
+  border: 1.5px solid var(--border); font-size: 12px;
+  font-family: 'DM Sans', sans-serif; color: var(--text);
+  outline: none; resize: none; transition: border-color 0.2s; background: #fafcff;
+  line-height: 1.4;
+}
+.qr-desc-input:focus { border-color: var(--blue); background: white; }
+.qr-desc-input::placeholder { color: #bbb; font-style: italic; }
 .qr-actions { display: flex; gap: 8px; width: 100%; }
 .btn-dl, .btn-copy {
   flex: 1; padding: 7px 0; border-radius: 8px; border: none;
@@ -264,9 +275,12 @@ function generateAll() {
     `<span>Ejemplo: </span>${base}/estanque.html?sala=1&estanque=1${tempParams}`;
 
   for (let s = 1; s <= 4; s++) {
-    qrData[s] = {};
+    if (!qrData[s]) qrData[s] = {};
     for (let e = 1; e <= numEst; e++) {
-      qrData[s][e] = { url: `${base}/estanque.html?sala=${s}&estanque=${e}${tempParams}` };
+      const baseEntry = `${base}/estanque.html?sala=${s}&estanque=${e}${tempParams}`;
+      // Preservar descripción existente si ya había una
+      const prevDesc = qrData[s][e]?.desc || '';
+      qrData[s][e] = { baseUrl: baseEntry, url: baseEntry, desc: prevDesc };
     }
   }
   renderSala(currentSala);
@@ -286,11 +300,22 @@ function renderSala(sala) {
     grid.innerHTML = `<div class="empty-msg"><div class="icon">👆</div>Ingresa la URL y pulsa <strong>Generar QRs</strong></div>`;
     return;
   }
+
+  // Guardar descripciones actuales antes de limpiar el grid
+  const prevDesc = {};
+  Object.keys(qrData[sala]).forEach(e => {
+    const ta = document.getElementById(`desc_${sala}_${e}`);
+    if (ta) prevDesc[e] = ta.value;
+  });
+
   grid.innerHTML = '';
   Object.keys(qrData[sala]).forEach(est => {
-    const e   = parseInt(est);
-    const url = qrData[sala][est].url;
-    const qId = `qr_${sala}_${e}`;
+    const e    = parseInt(est);
+    const base = qrData[sala][est].baseUrl;
+    const qId  = `qr_${sala}_${e}`;
+    const dId  = `desc_${sala}_${e}`;
+    const savedDesc = prevDesc[e] || qrData[sala][est].desc || '';
+
     const card = document.createElement('div');
     card.className = 'qr-card';
     card.innerHTML = `
@@ -298,19 +323,53 @@ function renderSala(sala) {
         <div class="qr-sala">Sala ${sala}</div>
         <div class="qr-name">🐟 Estanque ${e}</div>
       </div>
+      <div class="qr-desc-wrap">
+        <span class="qr-desc-label">🏷️ Descripción</span>
+        <textarea class="qr-desc-input" id="${dId}" rows="2"
+          placeholder="Ej: Estanque de ostiones reproductores..."
+          oninput="refreshQR(${sala},${e})">${savedDesc}</textarea>
+      </div>
       <div class="qr-img-wrap" id="${qId}"></div>
-      <div class="qr-url">${url}</div>
+      <div class="qr-url" id="qrurl_${sala}_${e}"></div>
       <div class="qr-actions">
         <button class="btn-dl"   onclick="downloadQR(${sala},${e})">⬇ Descargar</button>
         <button class="btn-copy" id="copyBtn_${sala}_${e}" onclick="copyUrl(${sala},${e})">🔗 Copiar</button>
       </div>`;
     grid.appendChild(card);
-    new QRCode(document.getElementById(qId), {
-      text: url, width: 148, height: 148,
-      colorDark: '#1a202c', colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
-    });
+
+    // Generar QR con desc incluida si existe
+    buildQR(sala, e, savedDesc);
   });
+}
+
+/* Construye la URL final con desc y genera el QR */
+function buildQR(sala, e, desc) {
+  const entry   = qrData[sala][e];
+  const descEnc = desc.trim() ? '&desc=' + encodeURIComponent(desc.trim()) : '';
+  const url     = entry.baseUrl + descEnc;
+  entry.url     = url;
+  entry.desc    = desc;
+
+  // Actualizar label URL
+  const urlEl = document.getElementById(`qrurl_${sala}_${e}`);
+  if (urlEl) urlEl.textContent = url;
+
+  // Limpiar y redibujar QR
+  const wrap = document.getElementById(`qr_${sala}_${e}`);
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  new QRCode(wrap, {
+    text: url, width: 148, height: 148,
+    colorDark: '#1a202c', colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+}
+
+/* Se llama al escribir en el textarea */
+function refreshQR(sala, e) {
+  const ta   = document.getElementById(`desc_${sala}_${e}`);
+  const desc = ta ? ta.value : '';
+  buildQR(sala, e, desc);
 }
 
 function downloadQR(sala, est) {
@@ -333,6 +392,9 @@ function downloadQR(sala, est) {
 }
 
 function copyUrl(sala, est) {
+  // Leer desc actual del textarea antes de copiar
+  const ta  = document.getElementById(`desc_${sala}_${est}`);
+  if (ta) refreshQR(sala, est);
   const url = qrData[sala]?.[est]?.url;
   if (!url) return;
   navigator.clipboard.writeText(url).then(() => {

@@ -324,7 +324,22 @@ body::before {
 }
 .info-card strong { color: var(--blue); font-size: 13px; }
 
-/* ── RANGO ── */
+/* ── DESCRIPCIÓN ESTANQUE ── */
+.desc-card {
+  background: linear-gradient(135deg, #f0f8ff, #f8fff0);
+  border: 1px solid #c3e6ff;
+  border-left: 4px solid var(--blue);
+  border-radius: 14px;
+  padding: 13px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(10,132,255,0.07);
+}
+.desc-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.desc-body { display: flex; flex-direction: column; gap: 2px; }
+.desc-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: var(--blue); }
+.desc-text  { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.4; }
 .range-info {
   background: linear-gradient(135deg, #e8f4ff, #f0fff4);
   border: 1px solid #c3e6ff;
@@ -432,6 +447,7 @@ const TEMP_OBJ_MIN  = parseFloat(params.get('tmin')) || 18;
 const TEMP_OBJ_MAX  = parseFloat(params.get('tmax')) || 24;
 const GAUGE_ABS_MIN = parseFloat(params.get('gmin')) || 10;
 const GAUGE_ABS_MAX = parseFloat(params.get('gmax')) || 25;
+const DESC_ESTANQUE = params.get('desc') ? decodeURIComponent(params.get('desc')) : '';
 
 /* ══════════════════════════════════════
    VALIDAR
@@ -499,6 +515,16 @@ function buildUI() {
         <div class="last-update" id="lastUpdate">--</div>
       </div>
     </div>
+
+    <!-- Descripción personalizada (solo si viene en la URL) -->
+    ${DESC_ESTANQUE ? `
+    <div class="desc-card">
+      <span class="desc-icon">🏷️</span>
+      <div class="desc-body">
+        <span class="desc-label">Descripción</span>
+        <span class="desc-text">${DESC_ESTANQUE}</span>
+      </div>
+    </div>` : ''}
 
     <!-- Rango objetivo -->
     <div class="range-info">
