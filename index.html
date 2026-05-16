@@ -336,6 +336,55 @@ canvas { width:100% !important; height:220px !important; }
   .main { margin-left:0; padding:12px; padding-bottom:74px; }
   .bottom-nav { display:block; }
 }
+
+/* ═══════════════════════════════════════════════
+   CONFIG PAGE
+═══════════════════════════════════════════════ */
+.config-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:20px 22px; margin-bottom:16px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.05);
+}
+.config-section-label {
+  font-size:12px; font-weight:700; letter-spacing:0.5px;
+  color:var(--muted); text-transform:uppercase; margin-bottom:14px;
+}
+.config-row {
+  display:grid; grid-template-columns:1fr 1fr; gap:16px;
+}
+@media(max-width:500px){ .config-row { grid-template-columns:1fr; } }
+.config-field { display:flex; flex-direction:column; gap:6px; }
+.config-label { font-size:13px; font-weight:600; color:var(--text); }
+.config-input {
+  padding:10px 14px; border-radius:8px;
+  border:1.5px solid var(--border); font-size:16px;
+  font-family:'DM Mono',monospace; font-weight:500;
+  color:var(--text); background:var(--bg);
+  transition:border-color 0.2s;
+  width:100%;
+}
+.config-input:focus { outline:none; border-color:var(--blue); background:white; }
+.config-preview {
+  background:#f8faff; border:1.5px solid #d0e4ff;
+  border-radius:14px; padding:18px 22px; margin-bottom:20px;
+}
+.config-preview-label {
+  font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:0.8px; color:var(--blue); margin-bottom:14px;
+}
+.config-preview-note {
+  font-size:11px; color:var(--muted); margin-top:10px;
+  font-family:'DM Mono',monospace;
+}
+.config-btn {
+  padding:11px 22px; border-radius:9px; border:none;
+  font-size:14px; font-weight:600; cursor:pointer;
+  font-family:'DM Sans',sans-serif; transition:all 0.15s;
+}
+.config-btn.primary  { background:var(--blue); color:white; }
+.config-btn.primary:hover  { background:#0070e0; }
+.config-btn.secondary { background:var(--surface); color:var(--text); border:1.5px solid var(--border); }
+.config-btn.secondary:hover { background:#f0f4f8; }
 </style>
 </head>
 <body>
@@ -369,6 +418,9 @@ canvas { width:100% !important; height:220px !important; }
     <div class="sidebar-section">Sistema</div>
     <div class="nav-item" onclick="showPage('log')" id="nav-log">
       <span class="nav-icon">📋</span> Log de Mensajes
+    </div>
+    <div class="nav-item" onclick="showPage('config')" id="nav-config">
+      <span class="nav-icon">⚙️</span> Configuración
     </div>
 
     <div class="sidebar-footer">
@@ -422,7 +474,7 @@ canvas { width:100% !important; height:220px !important; }
         <span style="margin-left:auto;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">En tiempo real vía MQTT</span>
       </div>
 
-      <div class="section-title">Condiciones Ambientales</div>
+      <div class="section-title">Condiciones Ambientales Laboratorio</div>
 
       <div class="widgets-row">
         <div class="widget">
@@ -524,6 +576,67 @@ canvas { width:100% !important; height:220px !important; }
       </div>
     </div>
 
+    <!-- ══════════════════════════════════
+         PAGE: CONFIG
+    ══════════════════════════════════ -->
+    <div class="page" id="page-config">
+      <div class="section-title">⚙️ Configuración de Temperatura</div>
+
+      <div class="config-card">
+        <div class="config-section-label">🎯 Rango Objetivo (zona verde del gauge)</div>
+        <div class="config-row">
+          <div class="config-field">
+            <label class="config-label">Temp. mínima objetivo (°C)</label>
+            <input class="config-input" type="number" id="cfg_obj_min" step="0.5" value="18">
+          </div>
+          <div class="config-field">
+            <label class="config-label">Temp. máxima objetivo (°C)</label>
+            <input class="config-input" type="number" id="cfg_obj_max" step="0.5" value="24">
+          </div>
+        </div>
+      </div>
+
+      <div class="config-card">
+        <div class="config-section-label">📏 Escala del Gauge (rango visible)</div>
+        <div class="config-row">
+          <div class="config-field">
+            <label class="config-label">Gauge mínimo (°C)</label>
+            <input class="config-input" type="number" id="cfg_gauge_min" step="1" value="10">
+          </div>
+          <div class="config-field">
+            <label class="config-label">Gauge máximo (°C)</label>
+            <input class="config-input" type="number" id="cfg_gauge_max" step="1" value="25">
+          </div>
+        </div>
+      </div>
+
+      <div class="config-preview">
+        <div class="config-preview-label">Vista previa del gauge</div>
+        <div style="padding:0 8px">
+          <div class="gauge-track" style="height:14px;border-radius:999px">
+            <div class="gauge-target" id="cfg_preview_target"></div>
+            <div class="gauge-fill"   id="cfg_preview_fill"   style="width:55%;background:#34c759"></div>
+            <div class="gauge-needle" id="cfg_preview_needle" style="left:55%"></div>
+          </div>
+          <div class="gauge-limits" style="margin-top:4px">
+            <span id="cfg_preview_min_lbl">10°C</span>
+            <span id="cfg_preview_max_lbl">25°C</span>
+          </div>
+        </div>
+        <div class="config-preview-note">
+          Zona verde = objetivo &nbsp;|&nbsp; Aguja = temperatura actual de ejemplo (55%)
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="config-btn primary" onclick="applyConfig()">✅ Aplicar cambios</button>
+        <button class="config-btn secondary" onclick="resetConfig()">↩️ Restaurar valores por defecto</button>
+      </div>
+      <div id="cfg_msg" style="margin-top:12px;font-size:13px;font-weight:600;color:var(--green);display:none">
+        ✓ Configuración aplicada correctamente
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -535,10 +648,10 @@ const BROKER = "wss://6d31b72c4c354177bb806d74d6a1dcbe.s1.eu.hivemq.cloud:8884/m
 const MQUSER = "hivemq.webclient.1778085461653";
 const MQPASS = "P2q3Zmgp#,QxEBG8a;&6";
 
-const TEMP_OBJ_MIN  = 18;
-const TEMP_OBJ_MAX  = 24;
-const GAUGE_ABS_MIN = 10;
-const GAUGE_ABS_MAX = 25;
+let TEMP_OBJ_MIN  = 18;
+let TEMP_OBJ_MAX  = 24;
+let GAUGE_ABS_MIN = 10;
+let GAUGE_ABS_MAX = 25;
 const N_ESTANQUES   = 8;
 const MAX_CHART_PTS = 60;   // máximo puntos en gráficos BME
 const MAX_LOG       = 100;
@@ -1059,6 +1172,87 @@ function updateSensorCount() {
   Object.values(bmeData).forEach(sala => { if (Object.keys(sala).length > 0) count++; });
   document.getElementById('sidebarSensors').textContent = count;
 }
+
+/* ═══════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════ */
+function updateConfigPreview() {
+  const objMin  = parseFloat(document.getElementById('cfg_obj_min').value)  || TEMP_OBJ_MIN;
+  const objMax  = parseFloat(document.getElementById('cfg_obj_max').value)  || TEMP_OBJ_MAX;
+  const gaugeMin= parseFloat(document.getElementById('cfg_gauge_min').value)|| GAUGE_ABS_MIN;
+  const gaugeMax= parseFloat(document.getElementById('cfg_gauge_max').value)|| GAUGE_ABS_MAX;
+
+  const rango = gaugeMax - gaugeMin;
+  if (rango <= 0) return;
+  const leftPct = Math.max(0, ((objMin - gaugeMin) / rango * 100)).toFixed(1);
+  const widPct  = Math.max(0, ((objMax - objMin)   / rango * 100)).toFixed(1);
+
+  document.getElementById('cfg_preview_target').style.left  = leftPct + '%';
+  document.getElementById('cfg_preview_target').style.width = widPct  + '%';
+  document.getElementById('cfg_preview_min_lbl').textContent = gaugeMin + '°C';
+  document.getElementById('cfg_preview_max_lbl').textContent = gaugeMax + '°C';
+}
+
+function applyConfig() {
+  const objMin  = parseFloat(document.getElementById('cfg_obj_min').value);
+  const objMax  = parseFloat(document.getElementById('cfg_obj_max').value);
+  const gaugeMin= parseFloat(document.getElementById('cfg_gauge_min').value);
+  const gaugeMax= parseFloat(document.getElementById('cfg_gauge_max').value);
+
+  if (isNaN(objMin)||isNaN(objMax)||isNaN(gaugeMin)||isNaN(gaugeMax)) return;
+  if (objMin >= objMax)   { alert('El mínimo objetivo debe ser menor al máximo.'); return; }
+  if (gaugeMin >= gaugeMax){ alert('El mínimo del gauge debe ser menor al máximo.'); return; }
+  if (objMin < gaugeMin || objMax > gaugeMax) {
+    alert('El rango objetivo debe estar dentro del rango del gauge.'); return;
+  }
+
+  TEMP_OBJ_MIN  = objMin;
+  TEMP_OBJ_MAX  = objMax;
+  GAUGE_ABS_MIN = gaugeMin;
+  GAUGE_ABS_MAX = gaugeMax;
+
+  // Re-renderizar todas las cards existentes con nuevos valores
+  Object.keys(estData).forEach(sala => {
+    Object.keys(estData[sala]).forEach(est => {
+      const cardId = `estCard_${sala}_${est}`;
+      const card = document.getElementById(cardId);
+      if (card) {
+        // Actualizar zona objetivo del gauge
+        const rango = GAUGE_ABS_MAX - GAUGE_ABS_MIN;
+        const leftPct = ((TEMP_OBJ_MIN - GAUGE_ABS_MIN) / rango * 100).toFixed(1);
+        const widPct  = ((TEMP_OBJ_MAX - TEMP_OBJ_MIN)  / rango * 100).toFixed(1);
+        const target = card.querySelector('.gauge-target');
+        if (target) { target.style.left = leftPct + '%'; target.style.width = widPct + '%'; }
+        // Actualizar etiquetas de escala
+        const limits = card.querySelectorAll('.gauge-limits span');
+        if (limits[0]) limits[0].textContent = GAUGE_ABS_MIN + '°C';
+        if (limits[1]) limits[1].textContent = GAUGE_ABS_MAX + '°C';
+        // Re-calcular fill/needle/color con la nueva escala
+        updateEstanqueCard(parseInt(sala), parseInt(est));
+      }
+    });
+  });
+
+  // Mostrar confirmación
+  const msg = document.getElementById('cfg_msg');
+  msg.style.display = 'block';
+  setTimeout(() => { msg.style.display = 'none'; }, 3000);
+}
+
+function resetConfig() {
+  document.getElementById('cfg_obj_min').value   = 18;
+  document.getElementById('cfg_obj_max').value   = 24;
+  document.getElementById('cfg_gauge_min').value = 10;
+  document.getElementById('cfg_gauge_max').value = 25;
+  updateConfigPreview();
+  applyConfig();
+}
+
+// Preview en tiempo real mientras escribe
+['cfg_obj_min','cfg_obj_max','cfg_gauge_min','cfg_gauge_max'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateConfigPreview);
+});
+updateConfigPreview();
 </script>
 <!-- BOTTOM NAV MOBILE -->
 <nav class="bottom-nav">
@@ -1074,6 +1268,9 @@ function updateSensorCount() {
     </div>
     <div class="bnav-item" id="bnav-log" onclick="showPage('log')">
       <span class="bnav-icon">📋</span>Log
+    </div>
+    <div class="bnav-item" id="bnav-config" onclick="showPage('config')">
+      <span class="bnav-icon">⚙️</span>Config
     </div>
   </div>
 </nav>
