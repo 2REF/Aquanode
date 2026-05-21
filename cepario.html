@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CeparioNode | Monitor Ambiental</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.4/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
+<style>
+:root {
+  --bg:       #f4faf7;
+  --bg2:      #eaf4ef;
+  --surface:  #ffffff;
+  --surface2: #f0faf5;
+  --border:   #c8e6d5;
+  --border2:  #a0d4b8;
+  --text:     #0d2b1e;
+  --muted:    #4a8068;
+  --faint:    #9dc4b0;
+
+  --teal:     #00a878;
+  --teal2:    #007f5c;
+  --teal-lt:  rgba(0,168,120,0.10);
+  --aqua:     #008fa8;
+  --lime:     #4caf50;
+  --amber:    #e08000;
+  --red:      #d93025;
+  --blue:     #1976d2;
+
+  --sidebar-w:230px;
+  --header-h: 56px;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Outfit',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
+::-webkit-scrollbar { width:5px; }
+::-webkit-scrollbar-track { background:var(--bg2); }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:4px; }
+
+/* HEADER */
+header {
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  height:var(--header-h);
+  background:var(--teal2);
+  border-bottom:1px solid rgba(0,0,0,0.08);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 24px;
+  box-shadow:0 2px 12px rgba(0,100,70,0.15);
+}
+.logo { display:flex; align-items:center; gap:10px; }
+.logo-mark {
+  width:36px; height:36px;
+  background:rgba(255,255,255,0.2);
+  border:1.5px solid rgba(255,255,255,0.35);
+  border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; flex-shrink:0;
+}
+.logo-text { font-size:18px; font-weight:700; color:#ffffff; letter-spacing:-0.3px; }
+.logo-sub  { font-size:11px; color:rgba(255,255,255,0.72); letter-spacing:0.4px; }
+.header-right { display:flex; align-items:center; gap:14px; }
+.conn-badge {
+  display:flex; align-items:center; gap:7px;
+  background:rgba(255,255,255,0.18);
+  border:1px solid rgba(255,255,255,0.3);
+  border-radius:20px; padding:5px 12px;
+  font-family:'Space Mono',monospace; font-size:11px; color:rgba(255,255,255,0.9);
+}
+.conn-dot { width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,0.3); transition:all 0.3s; flex-shrink:0; }
+.conn-dot.ok  { background:#a8ffd4; box-shadow:0 0 6px #a8ffd4; animation:blink 2s infinite; }
+.conn-dot.err { background:#ffaaaa; box-shadow:0 0 6px #ffaaaa; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.clock { font-family:'Space Mono',monospace; font-size:13px; color:rgba(255,255,255,0.85); letter-spacing:1px; }
+
+/* LAYOUT */
+.layout { display:flex; margin-top:var(--header-h); min-height:calc(100vh - var(--header-h)); }
+
+/* SIDEBAR */
+.sidebar {
+  position:fixed; top:var(--header-h); left:0; bottom:0;
+  width:var(--sidebar-w);
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  overflow-y:auto; z-index:50;
+}
+.sidebar-label {
+  padding:18px 18px 6px;
+  font-family:'Space Mono',monospace; font-size:9px; font-weight:700;
+  letter-spacing:2px; color:var(--faint); text-transform:uppercase;
+}
+.nav-item {
+  display:flex; align-items:center; gap:10px;
+  margin:2px 10px; padding:10px 14px; border-radius:10px;
+  font-size:13px; font-weight:500; color:var(--muted);
+  cursor:pointer; transition:all 0.15s; user-select:none;
+  border:1px solid transparent;
+}
+.nav-item:hover { background:var(--bg2); color:var(--text); }
+.nav-item.active { background:var(--teal-lt); border-color:var(--border2); color:var(--teal2); font-weight:600; }
+.nav-icon { font-size:16px; flex-shrink:0; width:22px; text-align:center; }
+.sidebar-divider { height:1px; background:var(--border); margin:10px 18px; }
+
+.sala-selector { margin:8px 14px; padding:10px 12px; background:var(--bg2); border:1px solid var(--border2); border-radius:10px; }
+.sala-selector label { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--faint); display:block; margin-bottom:6px; }
+.sala-selector select { width:100%; background:transparent; border:none; outline:none; color:var(--teal2); font-family:'Outfit',sans-serif; font-size:13px; font-weight:600; cursor:pointer; }
+
+.sidebar-stats { margin:auto 0 0; padding:14px 18px; border-top:1px solid var(--border); font-family:'Space Mono',monospace; }
+.stat-row { display:flex; justify-content:space-between; align-items:center; padding:5px 0; font-size:10px; color:var(--muted); border-bottom:1px solid var(--border); }
+.stat-row:last-child { border-bottom:none; }
+.stat-val { color:var(--teal2); font-weight:700; font-size:11px; }
+.stat-val.warn { color:var(--amber); }
+
+/* MAIN */
+.main { margin-left:var(--sidebar-w); flex:1; padding:22px; min-width:0; }
+.page { display:none; }
+.page.active { display:block; animation:fadeUp 0.3s ease both; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+.section-title {
+  display:flex; align-items:center; gap:10px;
+  font-family:'Space Mono',monospace; font-size:9px; font-weight:700;
+  letter-spacing:2.5px; text-transform:uppercase; color:var(--faint); margin-bottom:16px;
+}
+.section-title::after { content:''; flex:1; height:1px; background:linear-gradient(90deg,var(--border),transparent); }
+
+/* ALERT PANEL */
+.alert-panel {
+  background:var(--surface); border:1px solid var(--border);
+  border-left:4px solid var(--teal);
+  border-radius:14px; padding:18px 20px; margin-bottom:24px;
+  box-shadow:0 2px 10px rgba(0,168,120,0.07);
+}
+.alert-panel-title {
+  font-family:'Space Mono',monospace; font-size:9px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--teal2); margin-bottom:14px;
+  display:flex; align-items:center; gap:8px;
+}
+.alert-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; }
+.alert-field { display:flex; flex-direction:column; gap:6px; }
+.alert-field label { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+.alert-field-row { display:flex; gap:6px; align-items:center; }
+.alert-input {
+  flex:1; background:var(--bg2); border:1.5px solid var(--border2);
+  border-radius:8px; padding:7px 10px;
+  font-family:'Space Mono',monospace; font-size:13px; color:var(--teal2);
+  outline:none; transition:border-color 0.2s; min-width:0;
+}
+.alert-input:focus { border-color:var(--teal); background:white; }
+.alert-unit { font-family:'Space Mono',monospace; font-size:11px; color:var(--muted); white-space:nowrap; }
+.btn-apply {
+  padding:9px 20px; background:var(--teal2); color:white;
+  border:none; border-radius:8px; font-family:'Outfit',sans-serif;
+  font-size:13px; font-weight:700; cursor:pointer; transition:background 0.15s; align-self:flex-end;
+}
+.btn-apply:hover { background:var(--teal); }
+
+/* WIDGETS */
+.widgets-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin-bottom:24px; }
+.widget {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:16px; padding:20px;
+  position:relative; overflow:hidden;
+  transition:border-color 0.2s, box-shadow 0.2s;
+  box-shadow:0 2px 8px rgba(0,100,70,0.06);
+}
+.widget:hover { border-color:var(--border2); box-shadow:0 6px 24px rgba(0,100,70,0.12); }
+.widget::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--w-accent,var(--teal)); }
+.widget.flash { animation:wflash 0.5s ease; }
+@keyframes wflash { 0%{box-shadow:0 0 0 3px rgba(0,168,120,0.25)} 100%{box-shadow:0 2px 8px rgba(0,100,70,0.06)} }
+.widget-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.widget-label { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+.widget-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; }
+.widget-val-row { display:flex; align-items:flex-end; gap:4px; margin-bottom:12px; }
+.widget-val { font-family:'Space Mono',monospace; font-size:48px; font-weight:700; line-height:1; letter-spacing:-2px; color:var(--w-accent,var(--teal)); transition:color 0.4s; }
+.widget-unit { font-size:15px; color:var(--muted); margin-bottom:8px; }
+
+.w-gauge-track { height:8px; border-radius:999px; background:var(--bg2); position:relative; overflow:visible; margin-bottom:4px; }
+.w-gauge-fill { position:absolute; top:0; bottom:0; left:0; border-radius:999px; transition:width 0.6s cubic-bezier(0.34,1.4,0.64,1); }
+.w-gauge-alert { position:absolute; top:-5px; bottom:-5px; width:2.5px; border-radius:1px; background:var(--amber); box-shadow:0 0 6px rgba(224,128,0,0.5); transform:translateX(-50%); transition:left 0.3s; }
+.w-gauge-limits { display:flex; justify-content:space-between; font-family:'Space Mono',monospace; font-size:9px; color:var(--faint); margin-bottom:10px; }
+.widget-meta { display:flex; gap:12px; flex-wrap:wrap; font-family:'Space Mono',monospace; font-size:10px; margin-bottom:6px; }
+.meta-max { color:var(--amber); font-weight:700; }
+.meta-min { color:var(--blue); font-weight:700; }
+.meta-time { color:var(--faint); margin-left:auto; }
+
+.widget-trend { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:20px; font-family:'Space Mono',monospace; font-size:10px; font-weight:700; }
+.widget-trend.up-bad    { background:#fef2f2; color:var(--red); }
+.widget-trend.up-good   { background:#f0fdf4; color:var(--lime); }
+.widget-trend.down-good { background:#f0fdf4; color:var(--teal2); }
+.widget-trend.neutral   { background:var(--bg2); color:var(--muted); }
+.alert-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-family:'Space Mono',monospace; font-size:9px; font-weight:700; background:#fef2f2; color:var(--red); border:1px solid rgba(217,48,37,0.25); animation:apulse 1.2s infinite; margin-top:6px; }
+@keyframes apulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+
+/* CHARTS */
+.chart-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:16px; padding:18px; margin-bottom:14px;
+  box-shadow:0 2px 8px rgba(0,100,70,0.05);
+}
+.chart-card:hover { border-color:var(--border2); }
+.chart-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.chart-label { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--text); }
+.chart-dot { width:8px; height:8px; border-radius:50%; }
+.chart-last { font-family:'Space Mono',monospace; font-size:12px; color:var(--muted); }
+canvas { width:100%!important; height:180px!important; }
+
+/* STATUS */
+.status-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:24px; }
+.status-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(0,100,70,0.05); }
+.status-card-title { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+.status-value { font-family:'Space Mono',monospace; font-size:26px; font-weight:700; color:var(--teal2); }
+.status-sub { font-size:11px; color:var(--muted); margin-top:4px; }
+.broker-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px; font-family:'Space Mono',monospace; font-size:11px; color:var(--muted); line-height:2; box-shadow:0 2px 6px rgba(0,100,70,0.05); }
+.broker-card strong { color:var(--teal2); }
+.broker-card .topic { color:var(--aqua); }
+
+/* LOG */
+.log-wrap { background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow:0 2px 6px rgba(0,100,70,0.05); }
+.log-head { display:grid; grid-template-columns:90px 1fr 130px; background:var(--bg2); border-bottom:1px solid var(--border); padding:8px 16px; font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+.log-body { max-height:580px; overflow-y:auto; }
+.log-row { display:grid; grid-template-columns:90px 1fr 130px; padding:8px 16px; border-bottom:1px solid var(--bg2); font-family:'Space Mono',monospace; font-size:11px; transition:background 0.1s; }
+.log-row:hover { background:var(--bg2); }
+.log-t  { color:var(--faint); }
+.log-tp { color:var(--aqua); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.log-v  { color:var(--teal2); font-weight:700; text-align:right; }
+.log-v.alerta { color:var(--red); }
+
+/* BOTTOM NAV */
+.bottom-nav { display:none; position:fixed; bottom:0; left:0; right:0; height:60px; background:var(--surface); border-top:1px solid var(--border); z-index:200; box-shadow:0 -2px 10px rgba(0,100,70,0.08); }
+.bottom-nav-inner { display:flex; height:100%; }
+.bnav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:9px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; color:var(--muted); cursor:pointer; border-top:2px solid transparent; transition:all 0.15s; font-family:'Space Mono',monospace; -webkit-tap-highlight-color:transparent; }
+.bnav-item.active { color:var(--teal2); border-top-color:var(--teal2); background:var(--teal-lt); }
+.bnav-icon { font-size:18px; line-height:1; }
+.empty-state { text-align:center; padding:50px 20px; color:var(--muted); font-size:13px; }
+.empty-state .icon { font-size:34px; margin-bottom:10px; opacity:0.3; }
+
+@media(max-width:680px) {
+  :root { --sidebar-w:0px; }
+  .sidebar { display:none; }
+  .main { margin-left:0; padding:12px; padding-bottom:72px; }
+  .bottom-nav { display:block; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">&#127807;</div>
+    <div>
+      <div class="logo-text">CeparioNode</div>
+      <div class="logo-sub">Monitor Ambiental &middot; Fitoplancton</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="clock" id="clockEl">--:--:--</div>
+    <div class="conn-badge">
+      <div class="conn-dot" id="mqttDot"></div>
+      <span id="mqttStatus">Conectando...</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <nav class="sidebar">
+    <div class="sidebar-label">Monitoreo</div>
+    <div class="nav-item active" onclick="showPage('ambiente')" id="nav-ambiente"><span class="nav-icon">&#127777;</span> NODO Ambiental</div>
+    <div class="nav-item" onclick="showPage('graficos')" id="nav-graficos"><span class="nav-icon">&#128200;</span> Gr&aacute;ficos</div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-label">Sistema</div>
+    <div class="nav-item" onclick="showPage('estado')" id="nav-estado"><span class="nav-icon">&#128225;</span> Estado</div>
+    <div class="nav-item" onclick="showPage('log')" id="nav-log"><span class="nav-icon">&#128203;</span> Log MQTT</div>
+    <div class="sidebar-divider"></div>
+    <div class="sala-selector">
+      <label>Sala activa</label>
+      <select id="salaSelect" onchange="onSalaChange()">
+        <option value="1">Sala 1</option>
+        <option value="2">Sala 2</option>
+        <option value="3">Sala 3</option>
+        <option value="4">Sala 4</option>
+      </select>
+    </div>
+    <div class="sidebar-stats">
+      <div class="stat-row"><span>MENSAJES</span><span class="stat-val" id="statMsg">0</span></div>
+      <div class="stat-row"><span>ALERTAS</span><span class="stat-val warn" id="statAlerts">0</span></div>
+      <div class="stat-row"><span>ULTIMA RX</span><span class="stat-val" id="statLast">--</span></div>
+      <div class="stat-row" style="margin-top:8px;font-size:12px;color:var(--faint);border-bottom:none">sysops: felipe.ramirez@ucn.cl</div>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <!-- PAGE AMBIENTE -->
+    <div class="page active" id="page-ambiente">
+      <div class="alert-panel">
+        <div class="alert-panel-title">&#9881; Umbrales de Alerta por Par&aacute;metro</div>
+        <div class="alert-grid">
+          <div class="alert-field">
+            <label>&#127777; Temperatura min / max</label>
+            <div class="alert-field-row">
+              <input class="alert-input" type="number" id="aTempMin" value="18" step="0.5">
+              <span class="alert-unit">--</span>
+              <input class="alert-input" type="number" id="aTempMax" value="26" step="0.5">
+              <span class="alert-unit">&deg;C</span>
+            </div>
+          </div>
+          <div class="alert-field">
+            <label>&#128167; Humedad min / max</label>
+            <div class="alert-field-row">
+              <input class="alert-input" type="number" id="aHumMin" value="40" step="1">
+              <span class="alert-unit">--</span>
+              <input class="alert-input" type="number" id="aHumMax" value="85" step="1">
+              <span class="alert-unit">%</span>
+            </div>
+          </div>
+          <div class="alert-field">
+            <label>&#128309; Presi&oacute;n min / max</label>
+            <div class="alert-field-row">
+              <input class="alert-input" type="number" id="aPresMin" value="980" step="1">
+              <span class="alert-unit">--</span>
+              <input class="alert-input" type="number" id="aPresMax" value="1030" step="1">
+              <span class="alert-unit">hPa</span>
+            </div>
+          </div>
+          <div class="alert-field" style="justify-content:flex-end">
+            <button class="btn-apply" onclick="applyAlerts()">&#10003; Aplicar umbrales</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Condiciones en Tiempo Real</div>
+      <div class="widgets-row">
+
+        <div class="widget" id="wTemp" style="--w-accent:var(--teal)">
+          <div class="widget-top">
+            <span class="widget-label">Temperatura</span>
+            <div class="widget-icon" style="background:rgba(0,168,120,0.10)">&#127777;</div>
+          </div>
+          <div class="widget-val-row">
+            <span class="widget-val" id="wTempVal">--.-</span>
+            <span class="widget-unit">&deg;C</span>
+          </div>
+          <div class="w-gauge-track">
+            <div class="w-gauge-fill" id="wTempFill" style="width:0%;background:var(--teal)"></div>
+            <div class="w-gauge-alert" id="wTempAlertLine" style="left:52%"></div>
+          </div>
+          <div class="w-gauge-limits"><span>0&deg;C</span><span>50&deg;C</span></div>
+          <div class="widget-meta">
+            <span class="meta-max" id="wTempMax">&#8593; --</span>
+            <span class="meta-min" id="wTempMin">&#8595; --</span>
+            <span class="meta-time" id="wTempTime">--</span>
+          </div>
+          <div class="widget-trend neutral" id="wTempTrend">sin datos</div>
+          <div id="wTempAlert" style="display:none"><span class="alert-badge">&#9888; FUERA DE RANGO</span></div>
+        </div>
+
+        <div class="widget" id="wHum" style="--w-accent:var(--lime)">
+          <div class="widget-top">
+            <span class="widget-label">Humedad Relativa</span>
+            <div class="widget-icon" style="background:rgba(76,175,80,0.10)">&#128167;</div>
+          </div>
+          <div class="widget-val-row">
+            <span class="widget-val" id="wHumVal" style="color:var(--lime)">--.-</span>
+            <span class="widget-unit">%</span>
+          </div>
+          <div class="w-gauge-track">
+            <div class="w-gauge-fill" id="wHumFill" style="width:0%;background:var(--lime)"></div>
+            <div class="w-gauge-alert" id="wHumAlertLine" style="left:85%"></div>
+          </div>
+          <div class="w-gauge-limits"><span>0%</span><span>100%</span></div>
+          <div class="widget-meta">
+            <span class="meta-max" id="wHumMax">&#8593; --</span>
+            <span class="meta-min" id="wHumMin">&#8595; --</span>
+            <span class="meta-time" id="wHumTime">--</span>
+          </div>
+          <div class="widget-trend neutral" id="wHumTrend">sin datos</div>
+          <div id="wHumAlert" style="display:none"><span class="alert-badge">&#9888; FUERA DE RANGO</span></div>
+        </div>
+
+        <div class="widget" id="wPres" style="--w-accent:var(--aqua)">
+          <div class="widget-top">
+            <span class="widget-label">Presi&oacute;n Atmosf&eacute;rica</span>
+            <div class="widget-icon" style="background:rgba(0,143,168,0.10)">&#128309;</div>
+          </div>
+          <div class="widget-val-row">
+            <span class="widget-val" id="wPresVal" style="color:var(--aqua)">--.-</span>
+            <span class="widget-unit">hPa</span>
+          </div>
+          <div class="w-gauge-track">
+            <div class="w-gauge-fill" id="wPresFill" style="width:0%;background:var(--aqua)"></div>
+            <div class="w-gauge-alert" id="wPresAlertLine" style="left:78%"></div>
+          </div>
+          <div class="w-gauge-limits"><span>960</span><span>1050</span></div>
+          <div class="widget-meta">
+            <span class="meta-max" id="wPresMax">&#8593; --</span>
+            <span class="meta-min" id="wPresMin">&#8595; --</span>
+            <span class="meta-time" id="wPresTime">--</span>
+          </div>
+          <div class="widget-trend neutral" id="wPresTrend">sin datos</div>
+          <div id="wPresAlert" style="display:none"><span class="alert-badge">&#9888; FUERA DE RANGO</span></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PAGE GRAFICOS -->
+    <div class="page" id="page-graficos">
+      <div class="section-title">Hist&oacute;rico Tiempo Real</div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-label"><div class="chart-dot" style="background:var(--teal);box-shadow:0 0 6px rgba(0,168,120,0.4)"></div>Temperatura Ambiente (&deg;C)</div>
+          <div class="chart-last">&#218;ltimo: <span id="chartTempLast" style="color:var(--teal);font-weight:700">--</span> &deg;C</div>
+        </div>
+        <canvas id="chartTemp"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-label"><div class="chart-dot" style="background:var(--lime);box-shadow:0 0 6px rgba(76,175,80,0.4)"></div>Humedad Relativa (%)</div>
+          <div class="chart-last">&#218;ltimo: <span id="chartHumLast" style="color:var(--lime);font-weight:700">--</span> %</div>
+        </div>
+        <canvas id="chartHum"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-label"><div class="chart-dot" style="background:var(--aqua);box-shadow:0 0 6px rgba(0,143,168,0.4)"></div>Presi&oacute;n Atmosf&eacute;rica (hPa)</div>
+          <div class="chart-last">&#218;ltimo: <span id="chartPresLast" style="color:var(--aqua);font-weight:700">--</span> hPa</div>
+        </div>
+        <canvas id="chartPres"></canvas>
+      </div>
+    </div>
+
+    <!-- PAGE ESTADO -->
+    <div class="page" id="page-estado">
+      <div class="section-title">Estado del Sistema</div>
+      <div class="status-grid">
+        <div class="status-card"><div class="status-card-title">Mensajes Recibidos</div><div class="status-value" id="stMsgCount">0</div><div class="status-sub">total en sesi&oacute;n</div></div>
+        <div class="status-card"><div class="status-card-title">Alertas Disparadas</div><div class="status-value" id="stAlertCount" style="color:var(--amber)">0</div><div class="status-sub">par&aacute;metros fuera de rango</div></div>
+        <div class="status-card"><div class="status-card-title">Sala Activa</div><div class="status-value" id="stSala">1</div><div class="status-sub">hatchery/sala1/ambiente</div></div>
+        <div class="status-card"><div class="status-card-title">Buffer de Datos</div><div class="status-value" id="stBuffer">0</div><div class="status-sub">m&aacute;x 60 pts por variable</div></div>
+      </div>
+      <div class="section-title">Conexi&oacute;n MQTT</div>
+      <div class="broker-card">
+        <strong>BROKER</strong><br>6d31b72c4c354177bb806d74d6a1dcbe.s1.eu.hivemq.cloud<br><br>
+        <strong>PROTOCOLO</strong><br>WSS / 8884<br><br>
+        <strong>T&Oacute;PICO SUSCRITO</strong><br><span class="topic">hatchery/#</span><br><br>
+        <strong>T&Oacute;PICO BME280</strong><br><span class="topic">hatchery/sala{N}/ambiente/temperatura|humedad|presion</span>
+      </div>
+    </div>
+
+    <!-- PAGE LOG -->
+    <div class="page" id="page-log">
+      <div class="section-title">Log de Mensajes MQTT</div>
+      <div class="log-wrap">
+        <div class="log-head"><span>Hora</span><span>T&oacute;pico</span><span style="text-align:right">Valor</span></div>
+        <div class="log-body" id="logBody">
+          <div class="empty-state"><div class="icon">&#128225;</div>Sin mensajes a&uacute;n...</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<nav class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <div class="bnav-item active" id="bnav-ambiente" onclick="showPage('ambiente')"><span class="bnav-icon">&#127777;</span>Ambiente</div>
+    <div class="bnav-item" id="bnav-graficos" onclick="showPage('graficos')"><span class="bnav-icon">&#128200;</span>Gr&aacute;ficos</div>
+    <div class="bnav-item" id="bnav-estado" onclick="showPage('estado')"><span class="bnav-icon">&#128225;</span>Estado</div>
+    <div class="bnav-item" id="bnav-log" onclick="showPage('log')"><span class="bnav-icon">&#128203;</span>Log</div>
+  </div>
+</nav>
+
+<script>
+var BROKER  = "wss://6d31b72c4c354177bb806d74d6a1dcbe.s1.eu.hivemq.cloud:8884/mqtt";
+var MQUSER  = "hivemq.webclient.1778085461653";
+var MQPASS  = "P2q3Zmgp#,QxEBG8a;&6";
+var MAX_PTS = 60;
+var MAX_LOG = 150;
+var msgCount = 0, alertCount = 0, activePage = "ambiente";
+var bmeData = {}, charts = {};
+var alerts = { temp:{min:18,max:26}, hum:{min:40,max:85}, pres:{min:980,max:1030} };
+
+setInterval(function(){
+  document.getElementById("clockEl").textContent = new Date().toLocaleTimeString("es-CL");
+}, 1000);
+
+function showPage(name) {
+  document.querySelectorAll(".page").forEach(function(p){ p.classList.remove("active"); });
+  document.querySelectorAll(".nav-item").forEach(function(n){ n.classList.remove("active"); });
+  document.querySelectorAll(".bnav-item").forEach(function(n){ n.classList.remove("active"); });
+  document.getElementById("page-" + name).classList.add("active");
+  document.getElementById("nav-"  + name).classList.add("active");
+  var bn = document.getElementById("bnav-" + name);
+  if (bn) bn.classList.add("active");
+  activePage = name;
+  if (name === "graficos") renderCharts();
+}
+
+function onSalaChange() {
+  var sala = parseInt(document.getElementById("salaSelect").value);
+  document.getElementById("stSala").textContent = sala;
+  ["Temp","Hum","Pres"].forEach(function(id) {
+    document.getElementById("w"+id+"Val").textContent  = "--.-";
+    document.getElementById("w"+id+"Time").textContent = "--";
+    document.getElementById("w"+id+"Max").textContent  = "-- ";
+    document.getElementById("w"+id+"Min").textContent  = "-- ";
+    document.getElementById("w"+id+"Trend").textContent = "sin datos";
+    document.getElementById("w"+id+"Trend").className  = "widget-trend neutral";
+    document.getElementById("w"+id+"Alert").style.display = "none";
+    document.getElementById("w"+id+"Fill").style.width = "0%";
+  });
+  if (activePage === "graficos") renderCharts();
+}
+
+function applyAlerts() {
+  alerts.temp.min = parseFloat(document.getElementById("aTempMin").value) || 18;
+  alerts.temp.max = parseFloat(document.getElementById("aTempMax").value) || 26;
+  alerts.hum.min  = parseFloat(document.getElementById("aHumMin").value)  || 40;
+  alerts.hum.max  = parseFloat(document.getElementById("aHumMax").value)  || 85;
+  alerts.pres.min = parseFloat(document.getElementById("aPresMin").value) || 980;
+  alerts.pres.max = parseFloat(document.getElementById("aPresMax").value) || 1030;
+  updateAlertLines();
+  var sala = parseInt(document.getElementById("salaSelect").value);
+  if (bmeData[sala]) {
+    ["temperatura","humedad","presion"].forEach(function(v) {
+      if (bmeData[sala][v] && bmeData[sala][v].length > 0) {
+        var last = bmeData[sala][v][bmeData[sala][v].length - 1];
+        updateWidget(v, sala, last.v, last.t);
+      }
+    });
+  }
+  var btn = document.querySelector(".btn-apply");
+  btn.textContent = "Aplicado!";
+  setTimeout(function(){ btn.textContent = "Aplicar umbrales"; }, 1500);
+}
+
+function updateAlertLines() {
+  document.getElementById("wTempAlertLine").style.left = ((alerts.temp.max / 50) * 100).toFixed(1) + "%";
+  document.getElementById("wHumAlertLine").style.left  = (alerts.hum.max).toFixed(1) + "%";
+  document.getElementById("wPresAlertLine").style.left = (((alerts.pres.max - 960) / (1050 - 960)) * 100).toFixed(1) + "%";
+}
+
+var client = mqtt.connect(BROKER, {
+  username: MQUSER, password: MQPASS,
+  clientId: "cepario_" + Math.random().toString(16).slice(2,8),
+  clean: true
+});
+client.on("connect", function() { setConn("ok","Conectado OK"); client.subscribe("hatchery/#"); });
+client.on("error",   function() { setConn("err","Error MQTT"); });
+client.on("offline", function() { setConn("","Desconectado"); });
+client.on("message", function(topic, payload) {
+  try {
+    var data  = JSON.parse(payload.toString());
+    var valor = parseFloat(data.valor);
+    var unidad = data.unidad || "";
+    if (isNaN(valor)) return;
+    handleMsg(topic, valor, unidad);
+  } catch(e) {}
+});
+
+function setConn(cls, text) {
+  document.getElementById("mqttDot").className = "conn-dot" + (cls ? " "+cls : "");
+  document.getElementById("mqttStatus").textContent = text;
+}
+
+function handleMsg(topic, valor, unidad) {
+  msgCount++;
+  var now = new Date();
+  var timeStr = now.toLocaleTimeString("es-CL");
+  document.getElementById("statMsg").textContent    = msgCount;
+  document.getElementById("stMsgCount").textContent = msgCount;
+  document.getElementById("statLast").textContent   = timeStr.slice(0,5);
+  var parts = topic.split("/");
+  if (parts.length < 4) return;
+  var salaNum = parseInt(parts[1].replace("sala","")) || 1;
+  var nodo    = parts[2];
+  var varStr  = parts[3];
+  if (nodo === "ambiente") {
+    if (!bmeData[salaNum]) bmeData[salaNum] = {};
+    if (!bmeData[salaNum][varStr]) bmeData[salaNum][varStr] = [];
+    bmeData[salaNum][varStr].push({ t:now, v:valor });
+    if (bmeData[salaNum][varStr].length > MAX_PTS) bmeData[salaNum][varStr].shift();
+    var salaActual = parseInt(document.getElementById("salaSelect").value);
+    if (salaNum === salaActual) {
+      updateWidget(varStr, salaNum, valor, now);
+      if (activePage === "graficos") renderCharts();
+    }
+    var buf = 0;
+    Object.values(bmeData).forEach(function(s){ Object.values(s).forEach(function(a){ buf += a.length; }); });
+    document.getElementById("stBuffer").textContent = buf;
+  }
+  addLog(timeStr, topic, valor, unidad);
+}
+
+function updateWidget(variable, sala, valor, date) {
+  var map     = { temperatura:"Temp", humedad:"Hum", presion:"Pres" };
+  var unitMap = { temperatura:"C", humedad:"%", presion:"hPa" };
+  var alMap   = { temperatura:alerts.temp, humedad:alerts.hum, presion:alerts.pres };
+  var clMap   = { temperatura:"chartTempLast", humedad:"chartHumLast", presion:"chartPresLast" };
+  var id = map[variable]; if (!id) return;
+  var unit = unitMap[variable];
+  var alrt = alMap[variable];
+  var pts  = bmeData[sala][variable] || [];
+
+  document.getElementById("w"+id+"Val").textContent  = valor.toFixed(2);
+  document.getElementById("w"+id+"Time").textContent = date.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
+  var clEl = document.getElementById(clMap[variable]);
+  if (clEl) clEl.textContent = valor.toFixed(2);
+
+  var maxV = pts[0].v, minV = pts[0].v;
+  pts.forEach(function(p){ if(p.v>maxV)maxV=p.v; if(p.v<minV)minV=p.v; });
+  document.getElementById("w"+id+"Max").textContent = "max " + maxV.toFixed(2) + " " + unit;
+  document.getElementById("w"+id+"Min").textContent = "min " + minV.toFixed(2) + " " + unit;
+
+  var fillPct = 0;
+  if (variable === "temperatura") fillPct = Math.min(100,Math.max(0,valor/50*100));
+  if (variable === "humedad")     fillPct = Math.min(100,Math.max(0,valor));
+  if (variable === "presion")     fillPct = Math.min(100,Math.max(0,(valor-960)/(1050-960)*100));
+  document.getElementById("w"+id+"Fill").style.width = fillPct + "%";
+
+  var out = valor < alrt.min || valor > alrt.max;
+  document.getElementById("w"+id+"Alert").style.display = out ? "block" : "none";
+  if (out) {
+    alertCount++;
+    document.getElementById("statAlerts").textContent   = alertCount;
+    document.getElementById("stAlertCount").textContent = alertCount;
+  }
+
+  var h1ago = date.getTime() - 3600000;
+  var ref = pts[0];
+  pts.forEach(function(p){ if(Math.abs(p.t.getTime()-h1ago)<Math.abs(ref.t.getTime()-h1ago)) ref=p; });
+  var delta = valor - ref.v;
+  var trendEl = document.getElementById("w"+id+"Trend");
+  if (Math.abs(delta) < 0.05) {
+    trendEl.textContent = "estable"; trendEl.className = "widget-trend neutral";
+  } else {
+    var sube = delta > 0;
+    var cls  = sube ? (variable==="temperatura"?"up-bad":"up-good") : "down-good";
+    trendEl.className   = "widget-trend " + cls;
+    trendEl.textContent = (sube?"+ ":"- ") + Math.abs(delta).toFixed(2) + " " + unit + "/hr";
+  }
+  var w = document.getElementById("w"+id);
+  if (w) { w.classList.remove("flash"); void w.offsetWidth; w.classList.add("flash"); }
+}
+
+function renderCharts() {
+  var sala = parseInt(document.getElementById("salaSelect").value);
+  var cfgs = [
+    { id:"chartTemp", variable:"temperatura", color:"#00a878", fill:"rgba(0,168,120,0.08)" },
+    { id:"chartHum",  variable:"humedad",     color:"#4caf50", fill:"rgba(76,175,80,0.08)" },
+    { id:"chartPres", variable:"presion",     color:"#008fa8", fill:"rgba(0,143,168,0.08)" }
+  ];
+  cfgs.forEach(function(cfg) {
+    var pts  = (bmeData[sala] && bmeData[sala][cfg.variable]) ? bmeData[sala][cfg.variable] : [];
+    var data = pts.map(function(p){ return { x:p.t, y:p.v }; });
+    if (charts[cfg.id]) charts[cfg.id].destroy();
+    charts[cfg.id] = new Chart(document.getElementById(cfg.id), {
+      data:{ datasets:[{ type:"line", data:data, borderColor:cfg.color, backgroundColor:cfg.fill,
+        borderWidth:2, tension:0.4, pointRadius:2, pointBackgroundColor:cfg.color, fill:true }] },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:"index", intersect:false },
+        plugins:{ legend:{ display:false } },
+        scales:{
+          x:{ type:"time", time:{ unit:"minute", displayFormats:{ minute:"HH:mm" } },
+              ticks:{ maxTicksLimit:8, maxRotation:0, color:"#9dc4b0" },
+              grid:{ color:"rgba(200,230,213,0.6)" }, border:{ color:"rgba(200,230,213,0.6)" } },
+          y:{ ticks:{ maxTicksLimit:5, color:"#9dc4b0" },
+              grid:{ color:"rgba(200,230,213,0.6)" }, border:{ color:"rgba(200,230,213,0.6)" } }
+        }
+      }
+    });
+  });
+}
+
+var logCount = 0;
+function addLog(time, topic, valor, unidad) {
+  var body = document.getElementById("logBody");
+  if (logCount === 0) body.innerHTML = "";
+  logCount++;
+  var alertCls = "";
+  if (topic.indexOf("/ambiente/") !== -1) {
+    var varName = topic.split("/")[3];
+    var am = { temperatura:alerts.temp, humedad:alerts.hum, presion:alerts.pres };
+    var a  = am[varName];
+    if (a && (valor < a.min || valor > a.max)) alertCls = "alerta";
+  }
+  var row = document.createElement("div");
+  row.className = "log-row";
+  row.innerHTML = "<span class='log-t'>" + time + "</span>" +
+    "<span class='log-tp'>" + topic + "</span>" +
+    "<span class='log-v " + alertCls + "'>" + valor.toFixed(3) + " " + unidad + "</span>";
+  body.prepend(row);
+  while (body.children.length > MAX_LOG) body.removeChild(body.lastChild);
+}
+
+updateAlertLines();
+</script>
+</body>
+</html>
