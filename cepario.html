@@ -72,7 +72,7 @@ header {
 .conn-dot.ok  { background:#a8ffd4; box-shadow:0 0 6px #a8ffd4; animation:blink 2s infinite; }
 .conn-dot.err { background:#ffaaaa; box-shadow:0 0 6px #ffaaaa; }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-.clock { font-family:'Space Mono',monospace; font-size:13px; color:rgba(255,255,255,0.85); letter-spacing:1px; }
+.clock { font-family:'Space Mono',monospace; font-size:12px; color:rgba(255,255,255,0.85); letter-spacing:1px; }
 
 /* LAYOUT */
 .layout { display:flex; margin-top:var(--header-h); min-height:calc(100vh - var(--header-h)); }
@@ -252,7 +252,7 @@ canvas { width:100%!important; height:180px!important; }
     <div class="logo-mark">&#127807;</div>
     <div>
       <div class="logo-text">CeparioNode</div>
-      <div class="logo-sub">Monitor Ambiental &middot; Fitoplancton</div>
+      <div class="logo-sub">Monitor Ambiental &middot; Laboratorio Fitoplancton</div>
     </div>
   </div>
   <div class="header-right">
@@ -573,7 +573,7 @@ function handleMsg(topic, valor, unidad) {
   var timeStr = now.toLocaleTimeString("es-CL");
   document.getElementById("statMsg").textContent    = msgCount;
   document.getElementById("stMsgCount").textContent = msgCount;
-  document.getElementById("statLast").textContent   = timeStr.slice(0,5);
+  document.getElementById("statLast").textContent   = timeStr;
   var parts = topic.split("/");
   if (parts.length < 4) return;
   var salaNum = parseInt(parts[1].replace("sala","")) || 1;
