@@ -6,10 +6,9 @@
 <title>CeparioNode | Monitor Ambiental</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.4/mqtt.min.js"></script>
-<script src="https://unpkg.com/@emailjs/browser@3/dist/email.min.js"></script>
-<script src="https://unpkg.com/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="https://unpkg.com/luxon@3/build/global/luxon.min.js"></script>
-<script src="https://unpkg.com/chartjs-adapter-luxon@1/dist/chartjs-adapter-luxon.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
 <style>
 :root {
   --bg:       #f4faf7;
@@ -32,7 +31,7 @@
   --blue:     #1976d2;
 
   --sidebar-w:250px;
-  --header-h: 72px;
+  --header-h: 56px;
 }
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:'Outfit',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
@@ -48,23 +47,19 @@ header {
   border-bottom:1px solid rgba(0,0,0,0.08);
   display:flex; align-items:center; justify-content:space-between;
   padding:0 24px;
-  box-shadow:0 2px 16px rgba(0,100,70,0.20);
+  box-shadow:0 2px 12px rgba(0,100,70,0.15);
 }
 .logo { display:flex; align-items:center; gap:10px; }
 .logo-mark {
-  width:52px; height:52px;
-  background:white;
-  border:2px solid rgba(255,255,255,0.5);
-  border-radius:12px;
+  width:36px; height:36px;
+  background:rgba(255,255,255,0.2);
+  border:1.5px solid rgba(255,255,255,0.35);
+  border-radius:10px;
   display:flex; align-items:center; justify-content:center;
-  overflow:hidden; flex-shrink:0;
-  box-shadow:0 2px 8px rgba(0,0,0,0.15);
+  font-size:20px; flex-shrink:0;
 }
-.logo-mark img {
-  width:100%; height:100%; object-fit:contain; padding:2px;
-}
-.logo-text { font-size:24px; font-weight:700; color:#ffffff; letter-spacing:-0.3px; }
-.logo-sub  { font-size:13px; color:rgba(255,255,255,0.72); letter-spacing:0.4px; }
+.logo-text { font-size:22px; font-weight:700; color:#ffffff; letter-spacing:-0.3px; }
+.logo-sub  { font-size:14px; color:rgba(255,255,255,0.72); letter-spacing:0.4px; }
 .header-right { display:flex; align-items:center; gap:14px; }
 .conn-badge {
   display:flex; align-items:center; gap:7px;
@@ -259,56 +254,6 @@ canvas { width:100%!important; height:180px!important; }
 .waiting-bar-fill { height:100%; width:40%; background:var(--teal); border-radius:999px; animation:wBar 2s ease-in-out infinite; }
 @keyframes wBar { 0%{margin-left:-40%} 100%{margin-left:100%} }
 
-
-/* EMAIL ALERT FIELD */
-.email-alert-row {
-  display:flex; gap:10px; align-items:flex-end;
-  margin-top:14px; padding-top:14px;
-  border-top:1px dashed var(--border2);
-  flex-wrap:wrap;
-}
-.email-alert-field { display:flex; flex-direction:column; gap:5px; flex:1; min-width:220px; }
-.email-alert-field label {
-  font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1.5px;
-  text-transform:uppercase; color:var(--teal2); font-weight:700;
-}
-.email-alert-input {
-  padding:9px 12px; border-radius:8px;
-  border:2px solid var(--border2); background:white;
-  font-family:'Outfit',sans-serif; font-size:14px; color:var(--text);
-  outline:none; transition:border-color 0.2s; width:100%;
-}
-.email-alert-input:focus { border-color:var(--teal); }
-.email-alert-input::placeholder { color:var(--faint); font-style:italic; }
-.email-status {
-  font-family:'Space Mono',monospace; font-size:10px;
-  margin-top:4px; min-height:14px;
-}
-.email-status.ok  { color:var(--teal2); }
-.email-status.err { color:var(--red); }
-
-/* COOLDOWN INFO */
-.cooldown-info {
-  font-family:'Space Mono',monospace; font-size:10px;
-  color:var(--faint); align-self:flex-end; padding-bottom:4px; white-space:nowrap;
-}
-
-/* TOAST NOTIFICATION */
-.toast {
-  position:fixed; bottom:24px; right:24px; z-index:9999;
-  background:var(--teal2); color:white;
-  padding:12px 20px; border-radius:12px;
-  font-family:'Outfit',sans-serif; font-size:14px; font-weight:600;
-  box-shadow:0 4px 20px rgba(0,100,70,0.3);
-  display:flex; align-items:center; gap:10px;
-  transform:translateY(80px); opacity:0;
-  transition:all 0.35s cubic-bezier(0.34,1.4,0.64,1);
-  max-width:320px;
-}
-.toast.show { transform:translateY(0); opacity:1; }
-.toast.error { background:var(--red); }
-.toast-icon { font-size:18px; flex-shrink:0; }
-
 .empty-state { text-align:center; padding:50px 20px; color:var(--muted); font-size:13px; }
 .empty-state .icon { font-size:34px; margin-bottom:10px; opacity:0.3; }
 
@@ -324,7 +269,7 @@ canvas { width:100%!important; height:180px!important; }
 
 <header>
   <div class="logo">
-    <div class="logo-mark"><img src="https://raw.githubusercontent.com/2ref/Aquanode/main/logo.png" alt="AquaNode Logo" onerror="this.parentElement.innerHTML='&#127807;'"></div>
+    <div class="logo-mark">&#127807;</div>
     <div>
       <div class="logo-text">CeparioNode</div>
       <div class="logo-sub">Monitor Ambiental &middot; Laboratorio Fitoplancton</div>
@@ -404,16 +349,6 @@ canvas { width:100%!important; height:180px!important; }
           <div class="alert-field" style="justify-content:flex-end">
             <button class="btn-apply" onclick="applyAlerts()">&#10003; Aplicar umbrales</button>
           </div>
-        </div>
-        <!-- EMAIL ALERT -->
-        <div class="email-alert-row">
-          <div class="email-alert-field">
-            <label>&#9993; Correo para alertas</label>
-            <input class="email-alert-input" type="email" id="alertEmail"
-              placeholder="ejemplo@correo.com">
-            <div class="email-status" id="emailStatus"></div>
-          </div>
-          <div class="cooldown-info" id="cooldownInfo">Cooldown: 5 min entre alertas</div>
         </div>
       </div>
 
@@ -618,74 +553,7 @@ function applyAlerts() {
   alerts.hum.max  = parseFloat(document.getElementById("aHumMax").value)  || 85;
   alerts.pres.min = parseFloat(document.getElementById("aPresMin").value) || 980;
   alerts.pres.max = parseFloat(document.getElementById("aPresMax").value) || 1030;
-  
-// ── EmailJS ──
-var EMAILJS_SERVICE  = "service_xvkmb3b";
-var EMAILJS_TEMPLATE = "template_xlh3uwa";
-var EMAILJS_KEY      = "PGP092uC0mmIOxVb_";
-emailjs.init({
-  publicKey: EMAILJS_KEY,
-  limitRate: { throttle: 10000 }
-});
-
-// Cooldown: evitar spam de correos (5 min por variable)
-var alertCooldown = {};   // alertCooldown["temperatura"] = timestamp
-
-function showToast(msg, isError) {
-  var t = document.getElementById("toastMsg");
-  var txt = document.getElementById("toastText");
-  var ico = document.getElementById("toastIcon");
-  txt.textContent = msg;
-  ico.textContent = isError ? "\u26a0" : "\u2709";
-  t.className = "toast" + (isError ? " error" : "");
-  void t.offsetWidth;
-  t.classList.add("show");
-  setTimeout(function(){ t.classList.remove("show"); }, 4000);
-}
-
-function sendAlertEmail(variable, valor, limite, sala) {
-  var email = document.getElementById("alertEmail").value.trim();
-  if (!email || !email.includes("@")) return;   // sin correo configurado, silencioso
-
-  var now = Date.now();
-  var lastSent = alertCooldown[variable] || 0;
-  var COOLDOWN_MS = 5 * 60 * 1000;   // 5 minutos
-  if (now - lastSent < COOLDOWN_MS) {
-    var remaining = Math.ceil((COOLDOWN_MS - (now - lastSent)) / 60000);
-    document.getElementById("cooldownInfo").textContent = "Cooldown: " + remaining + " min restantes (" + variable + ")";
-    return;
-  }
-
-  alertCooldown[variable] = now;
-  document.getElementById("cooldownInfo").textContent = "Enviando alerta...";
-
-  var varNames = { temperatura:"Temperatura", humedad:"Humedad", presion:"Presion" };
-  var unitMap  = { temperatura:"\u00b0C", humedad:"%", presion:"hPa" };
-
-  var templateParams = {
-    email:    email,
-    to_name:  email.split("@")[0],
-    variable: varNames[variable] || variable,
-    valor:    valor.toFixed(2) + " " + (unitMap[variable] || ""),
-    limite:   limite,
-    sala:     "Sala " + sala,
-    hora:     new Date().toLocaleString("es-CL")
-  };
-  console.log("EmailJS params:", JSON.stringify(templateParams));
-  emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, templateParams).then(function() {
-    document.getElementById("emailStatus").textContent = "\u2713 Ultima alerta enviada: " + new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
-    document.getElementById("emailStatus").className = "email-status ok";
-    document.getElementById("cooldownInfo").textContent = "Cooldown: 5 min entre alertas";
-    showToast("Alerta enviada a " + email, false);
-  }, function(err) {
-    document.getElementById("emailStatus").textContent = "\u2717 Error al enviar: " + JSON.stringify(err);
-    document.getElementById("emailStatus").className = "email-status err";
-    document.getElementById("cooldownInfo").textContent = "Cooldown: 5 min entre alertas";
-    showToast("Error al enviar alerta", true);
-  });
-}
-
-updateAlertLines();
+  updateAlertLines();
   var sala = parseInt(document.getElementById("salaSelect").value);
   if (bmeData[sala]) {
     ["temperatura","humedad","presion"].forEach(function(v) {
@@ -805,10 +673,6 @@ function updateWidget(variable, sala, valor, date) {
     alertCount++;
     document.getElementById("statAlerts").textContent   = alertCount;
     document.getElementById("stAlertCount").textContent = alertCount;
-    var limiteStr = valor < alrt.min
-      ? "min " + alrt.min + " " + unit
-      : "max " + alrt.max + " " + unit;
-    sendAlertEmail(variable, valor, limiteStr, sala);
   }
 
   var h1ago = date.getTime() - 3600000;
@@ -879,74 +743,7 @@ function addLog(time, topic, valor, unidad) {
   while (body.children.length > MAX_LOG) body.removeChild(body.lastChild);
 }
 
-
-// ── EmailJS ──
-var EMAILJS_SERVICE  = "service_xvkmb3b";
-var EMAILJS_TEMPLATE = "template_xlh3uwa";
-var EMAILJS_KEY      = "PGP092uC0mmIOxVb_";
-emailjs.init({
-  publicKey: EMAILJS_KEY,
-  limitRate: { throttle: 10000 }
-});
-
-// Cooldown: evitar spam de correos (5 min por variable)
-var alertCooldown = {};   // alertCooldown["temperatura"] = timestamp
-
-function showToast(msg, isError) {
-  var t = document.getElementById("toastMsg");
-  var txt = document.getElementById("toastText");
-  var ico = document.getElementById("toastIcon");
-  txt.textContent = msg;
-  ico.textContent = isError ? "\u26a0" : "\u2709";
-  t.className = "toast" + (isError ? " error" : "");
-  void t.offsetWidth;
-  t.classList.add("show");
-  setTimeout(function(){ t.classList.remove("show"); }, 4000);
-}
-
-function sendAlertEmail(variable, valor, limite, sala) {
-  var email = document.getElementById("alertEmail").value.trim();
-  if (!email || !email.includes("@")) return;   // sin correo configurado, silencioso
-
-  var now = Date.now();
-  var lastSent = alertCooldown[variable] || 0;
-  var COOLDOWN_MS = 5 * 60 * 1000;   // 5 minutos
-  if (now - lastSent < COOLDOWN_MS) {
-    var remaining = Math.ceil((COOLDOWN_MS - (now - lastSent)) / 60000);
-    document.getElementById("cooldownInfo").textContent = "Cooldown: " + remaining + " min restantes (" + variable + ")";
-    return;
-  }
-
-  alertCooldown[variable] = now;
-  document.getElementById("cooldownInfo").textContent = "Enviando alerta...";
-
-  var varNames = { temperatura:"Temperatura", humedad:"Humedad", presion:"Presion" };
-  var unitMap  = { temperatura:"\u00b0C", humedad:"%", presion:"hPa" };
-
-  emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
-    variable: varNames[variable] || variable,
-    valor:    valor.toFixed(2) + " " + (unitMap[variable] || ""),
-    limite:   limite,
-    sala:     "Sala " + sala,
-    hora:     new Date().toLocaleString("es-CL")
-  }).then(function() {
-    document.getElementById("emailStatus").textContent = "\u2713 Ultima alerta enviada: " + new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
-    document.getElementById("emailStatus").className = "email-status ok";
-    document.getElementById("cooldownInfo").textContent = "Cooldown: 5 min entre alertas";
-    showToast("Alerta enviada a " + email, false);
-  }, function(err) {
-    document.getElementById("emailStatus").textContent = "\u2717 Error al enviar: " + JSON.stringify(err);
-    document.getElementById("emailStatus").className = "email-status err";
-    document.getElementById("cooldownInfo").textContent = "Cooldown: 5 min entre alertas";
-    showToast("Error al enviar alerta", true);
-  });
-}
-
 updateAlertLines();
 </script>
-<div class="toast" id="toastMsg">
-  <span class="toast-icon" id="toastIcon">&#9993;</span>
-  <span id="toastText">Alerta enviada</span>
-</div>
 </body>
 </html>
