@@ -6,9 +6,9 @@
 <title>CeparioNode | Monitor Ambiental</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.4/mqtt.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
+<script src="https://unpkg.com/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/luxon@3/build/global/luxon.min.js"></script>
+<script src="https://unpkg.com/chartjs-adapter-luxon@1/dist/chartjs-adapter-luxon.umd.min.js"></script>
 <style>
 :root {
   --bg:       #f4faf7;
@@ -31,7 +31,7 @@
   --blue:     #1976d2;
 
   --sidebar-w:250px;
-  --header-h: 56px;
+  --header-h: 72px;
 }
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:'Outfit',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
@@ -47,19 +47,23 @@ header {
   border-bottom:1px solid rgba(0,0,0,0.08);
   display:flex; align-items:center; justify-content:space-between;
   padding:0 24px;
-  box-shadow:0 2px 12px rgba(0,100,70,0.15);
+  box-shadow:0 2px 16px rgba(0,100,70,0.20);
 }
 .logo { display:flex; align-items:center; gap:10px; }
 .logo-mark {
-  width:36px; height:36px;
-  background:rgba(255,255,255,0.2);
-  border:1.5px solid rgba(255,255,255,0.35);
-  border-radius:10px;
+  width:52px; height:52px;
+  background:white;
+  border:2px solid rgba(255,255,255,0.5);
+  border-radius:12px;
   display:flex; align-items:center; justify-content:center;
-  font-size:20px; flex-shrink:0;
+  overflow:hidden; flex-shrink:0;
+  box-shadow:0 2px 8px rgba(0,0,0,0.15);
 }
-.logo-text { font-size:22px; font-weight:700; color:#ffffff; letter-spacing:-0.3px; }
-.logo-sub  { font-size:14px; color:rgba(255,255,255,0.72); letter-spacing:0.4px; }
+.logo-mark img {
+  width:100%; height:100%; object-fit:contain; padding:2px;
+}
+.logo-text { font-size:24px; font-weight:700; color:#ffffff; letter-spacing:-0.3px; }
+.logo-sub  { font-size:13px; color:rgba(255,255,255,0.72); letter-spacing:0.4px; }
 .header-right { display:flex; align-items:center; gap:14px; }
 .conn-badge {
   display:flex; align-items:center; gap:7px;
@@ -254,6 +258,56 @@ canvas { width:100%!important; height:180px!important; }
 .waiting-bar-fill { height:100%; width:40%; background:var(--teal); border-radius:999px; animation:wBar 2s ease-in-out infinite; }
 @keyframes wBar { 0%{margin-left:-40%} 100%{margin-left:100%} }
 
+
+/* EMAIL ALERT FIELD */
+.email-alert-row {
+  display:flex; gap:10px; align-items:flex-end;
+  margin-top:14px; padding-top:14px;
+  border-top:1px dashed var(--border2);
+  flex-wrap:wrap;
+}
+.email-alert-field { display:flex; flex-direction:column; gap:5px; flex:1; min-width:220px; }
+.email-alert-field label {
+  font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1.5px;
+  text-transform:uppercase; color:var(--teal2); font-weight:700;
+}
+.email-alert-input {
+  padding:9px 12px; border-radius:8px;
+  border:2px solid var(--border2); background:white;
+  font-family:'Outfit',sans-serif; font-size:14px; color:var(--text);
+  outline:none; transition:border-color 0.2s; width:100%;
+}
+.email-alert-input:focus { border-color:var(--teal); }
+.email-alert-input::placeholder { color:var(--faint); font-style:italic; }
+.email-status {
+  font-family:'Space Mono',monospace; font-size:10px;
+  margin-top:4px; min-height:14px;
+}
+.email-status.ok  { color:var(--teal2); }
+.email-status.err { color:var(--red); }
+
+/* COOLDOWN INFO */
+.cooldown-info {
+  font-family:'Space Mono',monospace; font-size:10px;
+  color:var(--faint); align-self:flex-end; padding-bottom:4px; white-space:nowrap;
+}
+
+/* TOAST NOTIFICATION */
+.toast {
+  position:fixed; bottom:24px; right:24px; z-index:9999;
+  background:var(--teal2); color:white;
+  padding:12px 20px; border-radius:12px;
+  font-family:'Outfit',sans-serif; font-size:14px; font-weight:600;
+  box-shadow:0 4px 20px rgba(0,100,70,0.3);
+  display:flex; align-items:center; gap:10px;
+  transform:translateY(80px); opacity:0;
+  transition:all 0.35s cubic-bezier(0.34,1.4,0.64,1);
+  max-width:320px;
+}
+.toast.show { transform:translateY(0); opacity:1; }
+.toast.error { background:var(--red); }
+.toast-icon { font-size:18px; flex-shrink:0; }
+
 .empty-state { text-align:center; padding:50px 20px; color:var(--muted); font-size:13px; }
 .empty-state .icon { font-size:34px; margin-bottom:10px; opacity:0.3; }
 
@@ -269,7 +323,7 @@ canvas { width:100%!important; height:180px!important; }
 
 <header>
   <div class="logo">
-    <div class="logo-mark">&#127807;</div>
+    <div class="logo-mark"><img src="https://raw.githubusercontent.com/2ref/Aquanode/main/logo.png" alt="AquaNode Logo" onerror="this.parentElement.innerHTML='&#127807;'"></div>
     <div>
       <div class="logo-text">CeparioNode</div>
       <div class="logo-sub">Monitor Ambiental &middot; Laboratorio Fitoplancton</div>
@@ -349,6 +403,16 @@ canvas { width:100%!important; height:180px!important; }
           <div class="alert-field" style="justify-content:flex-end">
             <button class="btn-apply" onclick="applyAlerts()">&#10003; Aplicar umbrales</button>
           </div>
+        </div>
+        <!-- EMAIL ALERT -->
+        <div class="email-alert-row">
+          <div class="email-alert-field">
+            <label>&#9993; Correo para alertas</label>
+            <input class="email-alert-input" type="email" id="alertEmail"
+              placeholder="ejemplo@correo.com">
+            <div class="email-status" id="emailStatus"></div>
+          </div>
+          <div class="cooldown-info" id="cooldownInfo">Cooldown: 5 min entre alertas</div>
         </div>
       </div>
 
@@ -509,14 +573,22 @@ var MQUSER  = "hivemq.webclient.1778085461653";
 var MQPASS  = "P2q3Zmgp#,QxEBG8a;&6";
 var MAX_PTS = 60;
 var MAX_LOG = 150;
-var msgCount = 0, alertCount = 0, activePage = "ambiente";
-var bmeData = {}, charts = {};
+var W3F_KEY = "eafbda26-eaf6-400f-89dd-05fdda6e69e1";
+
+var msgCount   = 0;
+var alertCount = 0;
+var activePage = "ambiente";
+var bmeData    = {};
+var charts     = {};
+var alertCooldown = {};
 var alerts = { temp:{min:18,max:26}, hum:{min:40,max:85}, pres:{min:980,max:1030} };
 
+/* ── RELOJ ── */
 setInterval(function(){
   document.getElementById("clockEl").textContent = new Date().toLocaleTimeString("es-CL");
 }, 1000);
 
+/* ── NAVEGACION ── */
 function showPage(name) {
   document.querySelectorAll(".page").forEach(function(p){ p.classList.remove("active"); });
   document.querySelectorAll(".nav-item").forEach(function(n){ n.classList.remove("active"); });
@@ -529,23 +601,39 @@ function showPage(name) {
   if (name === "graficos") renderCharts();
 }
 
+/* ── SALA ── */
 function onSalaChange() {
   var sala = parseInt(document.getElementById("salaSelect").value);
   document.getElementById("stSala").textContent = sala;
   ["Temp","Hum","Pres"].forEach(function(id) {
-    document.getElementById("w"+id+"Val").textContent  = "--.-";
-    document.getElementById("w"+id+"Time").textContent = "--";
-    document.getElementById("w"+id+"Max").textContent  = "-- ";
-    document.getElementById("w"+id+"Min").textContent  = "-- ";
+    document.getElementById("w"+id+"Val").textContent   = "--.-";
+    document.getElementById("w"+id+"Time").textContent  = "--";
+    document.getElementById("w"+id+"Max").textContent   = "-- ";
+    document.getElementById("w"+id+"Min").textContent   = "-- ";
     document.getElementById("w"+id+"Trend").textContent = "sin datos";
-    document.getElementById("w"+id+"Trend").className  = "widget-trend neutral";
+    document.getElementById("w"+id+"Trend").className   = "widget-trend neutral";
     document.getElementById("w"+id+"Alert").style.display = "none";
-    document.getElementById("w"+id+"Fill").style.width = "0%";
+    document.getElementById("w"+id+"Fill").style.width  = "0%";
   });
   if (activePage === "graficos") renderCharts();
   if (activePage === "ambiente") resetToWaiting();
 }
 
+/* ── WAITING STATE ── */
+function showData() {
+  var overlay = document.getElementById("waitingOverlay");
+  var row     = document.getElementById("widgetsRow");
+  if (overlay) overlay.style.display = "none";
+  if (row)     row.style.display     = "grid";
+}
+function resetToWaiting() {
+  var overlay = document.getElementById("waitingOverlay");
+  var row     = document.getElementById("widgetsRow");
+  if (overlay) overlay.style.display = "flex";
+  if (row)     row.style.display     = "none";
+}
+
+/* ── ALERTAS CONFIG ── */
 function applyAlerts() {
   alerts.temp.min = parseFloat(document.getElementById("aTempMin").value) || 18;
   alerts.temp.max = parseFloat(document.getElementById("aTempMax").value) || 26;
@@ -565,7 +653,7 @@ function applyAlerts() {
   }
   var btn = document.querySelector(".btn-apply");
   btn.textContent = "Aplicado!";
-  setTimeout(function(){ btn.textContent = "Aplicar umbrales"; }, 1500);
+  setTimeout(function(){ btn.textContent = "\u2713 Aplicar umbrales"; }, 1500);
 }
 
 function updateAlertLines() {
@@ -574,6 +662,84 @@ function updateAlertLines() {
   document.getElementById("wPresAlertLine").style.left = (((alerts.pres.max - 960) / (1050 - 960)) * 100).toFixed(1) + "%";
 }
 
+/* ── TOAST ── */
+function showToast(msg, isError) {
+  var t   = document.getElementById("toastMsg");
+  var txt = document.getElementById("toastText");
+  var ico = document.getElementById("toastIcon");
+  txt.textContent = msg;
+  ico.textContent = isError ? "\u26a0" : "\u2709";
+  t.className = "toast" + (isError ? " error" : "");
+  void t.offsetWidth;
+  t.classList.add("show");
+  setTimeout(function(){ t.classList.remove("show"); }, 4000);
+}
+
+/* ── ENVIO EMAIL WEB3FORMS ── */
+function sendAlertEmail(variable, valor, limite, sala) {
+  var email = document.getElementById("alertEmail").value.trim();
+  if (!email || !email.includes("@")) return;
+
+  var now      = Date.now();
+  var lastSent = alertCooldown[variable] || 0;
+  var COOLDOWN = 5 * 60 * 1000;
+  if (now - lastSent < COOLDOWN) {
+    var min = Math.ceil((COOLDOWN - (now - lastSent)) / 60000);
+    document.getElementById("cooldownInfo").textContent = "Cooldown: " + min + " min restantes (" + variable + ")";
+    return;
+  }
+  alertCooldown[variable] = now;
+  document.getElementById("cooldownInfo").textContent = "Enviando alerta...";
+
+  var varNames = { temperatura:"Temperatura", humedad:"Humedad", presion:"Presion" };
+  var unitMap  = { temperatura:"\u00b0C", humedad:"%", presion:"hPa" };
+  var sala_act = parseInt(document.getElementById("salaSelect").value);
+
+  var mensaje = [
+    "\u26a0 PARAMETRO FUERA DE RANGO",
+    "",
+    "Parametro    : " + (varNames[variable] || variable),
+    "Valor actual : " + valor.toFixed(2) + " " + (unitMap[variable] || ""),
+    "Limite       : " + limite,
+    "Sala         : Sala " + sala_act,
+    "Hora         : " + new Date().toLocaleString("es-CL"),
+    "",
+    "---",
+    "CeparioNode | Monitor Ambiental Fitoplancton",
+    "SYSOPS: felipe.ramirez@ucn.cl"
+  ].join("\n");
+
+  fetch("https://api.web3forms.com/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify({
+      access_key: W3F_KEY,
+      subject:    "\u26a0 Alerta CeparioNode - " + (varNames[variable] || variable) + " fuera de rango",
+      from_name:  "CeparioNode Monitor",
+      email:      email,
+      message:    mensaje
+    })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data) {
+    if (data.success) {
+      document.getElementById("emailStatus").textContent = "\u2713 Alerta enviada: " + new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
+      document.getElementById("emailStatus").className   = "email-status ok";
+      document.getElementById("cooldownInfo").textContent = "Cooldown: 5 min entre alertas";
+      showToast("Alerta enviada a " + email, false);
+    } else {
+      throw new Error(data.message || "Error desconocido");
+    }
+  })
+  .catch(function(err) {
+    document.getElementById("emailStatus").textContent = "\u2717 Error: " + err.message;
+    document.getElementById("emailStatus").className   = "email-status err";
+    document.getElementById("cooldownInfo").textContent = "Cooldown: 5 min entre alertas";
+    showToast("Error: " + err.message, true);
+  });
+}
+
+/* ── MQTT ── */
 var client = mqtt.connect(BROKER, {
   username: MQUSER, password: MQPASS,
   clientId: "cepario_" + Math.random().toString(16).slice(2,8),
@@ -584,8 +750,8 @@ client.on("error",   function() { setConn("err","Error MQTT"); });
 client.on("offline", function() { setConn("","Desconectado"); });
 client.on("message", function(topic, payload) {
   try {
-    var data  = JSON.parse(payload.toString());
-    var valor = parseFloat(data.valor);
+    var data   = JSON.parse(payload.toString());
+    var valor  = parseFloat(data.valor);
     var unidad = data.unidad || "";
     if (isNaN(valor)) return;
     handleMsg(topic, valor, unidad);
@@ -593,18 +759,19 @@ client.on("message", function(topic, payload) {
 });
 
 function setConn(cls, text) {
-  document.getElementById("mqttDot").className = "conn-dot" + (cls ? " "+cls : "");
+  document.getElementById("mqttDot").className      = "conn-dot" + (cls ? " "+cls : "");
   document.getElementById("mqttStatus").textContent = text;
 }
 
+/* ── HANDLER MENSAJES ── */
 function handleMsg(topic, valor, unidad) {
   msgCount++;
-  var now = new Date();
+  var now     = new Date();
   var timeStr = now.toLocaleTimeString("es-CL");
   document.getElementById("statMsg").textContent    = msgCount;
   document.getElementById("stMsgCount").textContent = msgCount;
-  document.getElementById("statLast").textContent   = timeStr;
-  var parts = topic.split("/");
+  document.getElementById("statLast").textContent   = now.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
+  var parts   = topic.split("/");
   if (parts.length < 4) return;
   var salaNum = parseInt(parts[1].replace("sala","")) || 1;
   var nodo    = parts[2];
@@ -626,28 +793,15 @@ function handleMsg(topic, valor, unidad) {
   addLog(timeStr, topic, valor, unidad);
 }
 
-function showData() {
-  var overlay = document.getElementById("waitingOverlay");
-  var row     = document.getElementById("widgetsRow");
-  if (overlay) overlay.style.display = "none";
-  if (row)     row.style.display     = "grid";
-}
-
-function resetToWaiting() {
-  var overlay = document.getElementById("waitingOverlay");
-  var row     = document.getElementById("widgetsRow");
-  if (overlay) overlay.style.display = "flex";
-  if (row)     row.style.display     = "none";
-}
-
+/* ── WIDGET UPDATER ── */
 function updateWidget(variable, sala, valor, date) {
   showData();
-  var map     = { temperatura:"Temp", humedad:"Hum", presion:"Pres" };
-  var unitMap = { temperatura:"C", humedad:"%", presion:"hPa" };
-  var alMap   = { temperatura:alerts.temp, humedad:alerts.hum, presion:alerts.pres };
-  var clMap   = { temperatura:"chartTempLast", humedad:"chartHumLast", presion:"chartPresLast" };
-  var id = map[variable]; if (!id) return;
-  var unit = unitMap[variable];
+  var map   = { temperatura:"Temp", humedad:"Hum", presion:"Pres" };
+  var uMap  = { temperatura:"C", humedad:"%", presion:"hPa" };
+  var alMap = { temperatura:alerts.temp, humedad:alerts.hum, presion:alerts.pres };
+  var clMap = { temperatura:"chartTempLast", humedad:"chartHumLast", presion:"chartPresLast" };
+  var id   = map[variable];   if (!id) return;
+  var unit = uMap[variable];
   var alrt = alMap[variable];
   var pts  = bmeData[sala][variable] || [];
 
@@ -673,18 +827,20 @@ function updateWidget(variable, sala, valor, date) {
     alertCount++;
     document.getElementById("statAlerts").textContent   = alertCount;
     document.getElementById("stAlertCount").textContent = alertCount;
+    var limStr = valor < alrt.min ? "min "+alrt.min+" "+unit : "max "+alrt.max+" "+unit;
+    sendAlertEmail(variable, valor, limStr, sala);
   }
 
   var h1ago = date.getTime() - 3600000;
-  var ref = pts[0];
+  var ref   = pts[0];
   pts.forEach(function(p){ if(Math.abs(p.t.getTime()-h1ago)<Math.abs(ref.t.getTime()-h1ago)) ref=p; });
-  var delta = valor - ref.v;
+  var delta   = valor - ref.v;
   var trendEl = document.getElementById("w"+id+"Trend");
   if (Math.abs(delta) < 0.05) {
     trendEl.textContent = "estable"; trendEl.className = "widget-trend neutral";
   } else {
     var sube = delta > 0;
-    var cls  = sube ? (variable==="temperatura"?"up-bad":"up-good") : "down-good";
+    var cls  = sube ? (variable==="temperatura" ? "up-bad" : "up-good") : "down-good";
     trendEl.className   = "widget-trend " + cls;
     trendEl.textContent = (sube?"+ ":"- ") + Math.abs(delta).toFixed(2) + " " + unit + "/hr";
   }
@@ -692,12 +848,13 @@ function updateWidget(variable, sala, valor, date) {
   if (w) { w.classList.remove("flash"); void w.offsetWidth; w.classList.add("flash"); }
 }
 
+/* ── GRAFICOS ── */
 function renderCharts() {
   var sala = parseInt(document.getElementById("salaSelect").value);
   var cfgs = [
     { id:"chartTemp", variable:"temperatura", color:"#00a878", fill:"rgba(0,168,120,0.08)" },
-    { id:"chartHum",  variable:"humedad",     color:"#4caf50", fill:"rgba(76,175,80,0.08)" },
-    { id:"chartPres", variable:"presion",     color:"#008fa8", fill:"rgba(0,143,168,0.08)" }
+    { id:"chartHum",  variable:"humedad",     color:"#4caf50", fill:"rgba(76,175,80,0.08)"  },
+    { id:"chartPres", variable:"presion",     color:"#008fa8", fill:"rgba(0,143,168,0.08)"  }
   ];
   cfgs.forEach(function(cfg) {
     var pts  = (bmeData[sala] && bmeData[sala][cfg.variable]) ? bmeData[sala][cfg.variable] : [];
@@ -722,6 +879,7 @@ function renderCharts() {
   });
 }
 
+/* ── LOG ── */
 var logCount = 0;
 function addLog(time, topic, valor, unidad) {
   var body = document.getElementById("logBody");
@@ -743,7 +901,13 @@ function addLog(time, topic, valor, unidad) {
   while (body.children.length > MAX_LOG) body.removeChild(body.lastChild);
 }
 
+/* ── INIT ── */
 updateAlertLines();
 </script>
+
+<div class="toast" id="toastMsg">
+  <span class="toast-icon" id="toastIcon">&#9993;</span>
+  <span id="toastText">Alerta enviada</span>
+</div>
 </body>
 </html>
